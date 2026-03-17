@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "0"
+  },
+  "permissions": {
+    "allow": [
+      "Read(./**)",
+      "Edit(./**)",
+      "Write(./**)",
+      "Read",
+      "Read(**)",
+      "Glob(**)",
+      "Grep(**)",
+      "WebSearch",
+      "WebFetch(domain:wrench.ai)",
+      "WebFetch(domain:web.wrench.ai)",
+      "WebFetch(domain:api.v2.wrench.ai)",
+      "WebFetch(domain:prod-api.wrench.ai)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:www.notion.so/wrench-ai)",
+      "WebFetch(domain:datadoghq.dev)",
+      "WebFetch(domain:us5.datadoghq.dev)",
+      "WebFetch(domain:docs.datadoghq.com)",
+      "WebFetch(domain:fastapi-mcp.tadata.com)",
+      "WebFetch(domain:support.claude.com)",
+      "WebFetch(domain:thedocs.io)",
+      "WebFetch(domain:workos.com)",
+      "WebFetch(domain:docs.stripe.com)"
+    ],
+    "deny": [
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(py *)"
+    ],
+    "ask": [
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git pull *)",
+      "Bash(git merge *)",
+      "Bash(git rebase *)",
+      "Bash(git reset *)",
+      "Bash(uv add *)",
+      "Bash(uv remove *)",
+      "Bash(npm install *)",
+      "Bash(npm ci *)",
+      "Bash(terraform apply *)",
+      "Bash(terraform destroy *)",
+      "Bash(docker run *)",
+      "Bash(docker push *)",
+      "Bash(rm -rf *)",
+      "Bash(wget *)"
+    ],
+    "defaultMode": "dontAsk"
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash C:/Users/willem/.claude/hooks/hook-dispatcher.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash C:/Users/willem/.claude/hooks/claude-notify.sh completed"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash C:/Users/willem/.claude/hooks/hook-dispatcher.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash C:/Users/willem/.claude/hooks/claude-notify.sh notification"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash C:/Users/willem/.claude/hooks/hook-dispatcher.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash C:/Users/willem/.claude/hooks/claude-notify.sh approval"
+          }
+        ]
+      }
+    ],
+    "Elicitation": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash C:/Users/willem/.claude/hooks/hook-dispatcher.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash C:/Users/willem/.claude/hooks/claude-notify.sh elicitation"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash C:/Users/willem/.claude/hooks/command-guard.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash C:/Users/willem/.claude/hooks/hook-dispatcher.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash C:/Users/willem/.claude/hooks/track-agent-tokens.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash C:/Users/willem/.claude/hooks/hook-dispatcher.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {},
+  "spinnerVerbs": {
+    "mode": "replace",
+    "verbs": [
+      "Processing"
+    ]
+  },
+  "agent": "beebop",
+  "skipDangerousModePermissionPrompt": true
+}

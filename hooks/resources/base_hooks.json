@@ -1,0 +1,15 @@
+{
+  "SessionStart":      { "instruction": null },
+  "UserPromptSubmit":  { "instruction": null },
+  "PreToolUse":        { "instruction": null },
+  "PermissionRequest": { "instruction": null },
+  "PostToolUse":       { "instruction": null },
+  "PostToolUseFailure":{ "instruction": null },
+  "SubagentStart":     { "instruction": null },
+  "SubagentStop":      { "instruction": null },
+  "Elicitation":       { "instruction": null },
+  "ElicitationResult": { "instruction": null },
+  "TaskCompleted":     { "instruction": null },
+  "Stop":              { "instruction": null },
+  "SessionEnd":        { "instruction": null }
+}
