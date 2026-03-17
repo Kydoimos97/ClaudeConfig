@@ -62,11 +62,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash C:/Users/willem/.claude/hooks/hook-dispatcher.sh"
+            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh"
           },
           {
             "type": "command",
-            "command": "bash C:/Users/willem/.claude/hooks/claude-notify.sh completed"
+            "command": "bash $HOME/.claude/hooks/claude-notify.sh completed"
           }
         ]
       }
@@ -77,7 +77,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash C:/Users/willem/.claude/hooks/hook-dispatcher.sh"
+            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh"
           }
         ]
       }
@@ -88,11 +88,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash C:/Users/willem/.claude/hooks/hook-dispatcher.sh"
+            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh"
           },
           {
             "type": "command",
-            "command": "bash C:/Users/willem/.claude/hooks/claude-notify.sh approval"
+            "command": "bash $HOME/.claude/hooks/claude-notify.sh approval"
           }
         ]
       }
@@ -102,11 +102,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash C:/Users/willem/.claude/hooks/hook-dispatcher.sh"
+            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh"
           },
           {
             "type": "command",
-            "command": "bash C:/Users/willem/.claude/hooks/claude-notify.sh elicitation"
+            "command": "bash $HOME/.claude/hooks/claude-notify.sh elicitation"
           }
         ]
       }
@@ -117,11 +117,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash C:/Users/willem/.claude/hooks/command-guard.sh"
+            "command": "bash $HOME/.claude/hooks/command-guard.sh"
           },
           {
             "type": "command",
-            "command": "bash C:/Users/willem/.claude/hooks/hook-dispatcher.sh"
+            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh"
           }
         ]
       }
@@ -132,11 +132,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash C:/Users/willem/.claude/hooks/track-agent-tokens.sh"
+            "command": "bash $HOME/.claude/hooks/track-agent-tokens.sh"
           },
           {
             "type": "command",
-            "command": "bash C:/Users/willem/.claude/hooks/hook-dispatcher.sh"
+            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh"
           }
         ]
       }

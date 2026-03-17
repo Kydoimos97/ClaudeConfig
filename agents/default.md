@@ -338,7 +338,7 @@ Additional system-specific documentation may exist in:
 
 ```
 
-C:\Users\willem.claude\c_docs
+$HOME/.claude/c_docs
 
 ```
 

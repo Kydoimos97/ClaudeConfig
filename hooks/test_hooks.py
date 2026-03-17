@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Tuple
 
+HOME = os.path.expanduser("~")
 HOOKS_DIR = Path(__file__).parent
 PYTHON = shutil.which("python3") or shutil.which("python")
 if not PYTHON:
@@ -224,7 +225,7 @@ def test_command_guard_read_tool_pass() -> Tuple[bool, str]:
     payload = {
         "tool_name": "Read",
         "tool_input": {
-            "file_path": "C:/Users/willem/.claude/hooks/command-guard.py",
+            "file_path": f"{HOME}/.claude/hooks/command-guard.py",
             "limit": 50,
         },
     }
@@ -238,7 +239,7 @@ def test_command_guard_read_tool_pass() -> Tuple[bool, str]:
         return (False, f"expected status=APPROVED, got {entry.get('status')!r}")
     if entry.get("tool") != "Read":
         return (False, f"expected tool=Read, got {entry.get('tool')!r}")
-    if entry.get("target") != "C:/Users/willem/.claude/hooks/command-guard.py":
+    if entry.get("target") != f"{HOME}/.claude/hooks/command-guard.py":
         return (False, f"expected target=file path, got {entry.get('target')!r}")
     return (True, "")
 
@@ -248,7 +249,7 @@ def test_command_guard_edit_tool_pass() -> Tuple[bool, str]:
     payload = {
         "tool_name": "Edit",
         "tool_input": {
-            "file_path": "C:/Users/willem/.claude/hooks/command-guard.py",
+            "file_path": f"{HOME}/.claude/hooks/command-guard.py",
             "old_string": "def main():",
             "new_string": "def main():  # edited",
         },
@@ -263,7 +264,7 @@ def test_command_guard_edit_tool_pass() -> Tuple[bool, str]:
         return (False, f"expected status=APPROVED, got {entry.get('status')!r}")
     if entry.get("tool") != "Edit":
         return (False, f"expected tool=Edit, got {entry.get('tool')!r}")
-    if entry.get("target") != "C:/Users/willem/.claude/hooks/command-guard.py":
+    if entry.get("target") != f"{HOME}/.claude/hooks/command-guard.py":
         return (False, f"expected target=file path, got {entry.get('target')!r}")
     return (True, "")
 

@@ -23,3 +23,5 @@ telemetry/
 usage-data/
 image-cache/
 
+.claude/
+plugins/
