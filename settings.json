@@ -80,15 +80,6 @@
             "command": "bash C:/Users/willem/.claude/hooks/hook-dispatcher.sh"
           }
         ]
-      },
-      {
-        "matcher": "idle_prompt",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash C:/Users/willem/.claude/hooks/claude-notify.sh notification"
-          }
-        ]
       }
     ],
     "PermissionRequest": [
