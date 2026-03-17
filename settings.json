@@ -149,6 +149,6 @@
       "Processing"
     ]
   },
-  "agent": "beebop",
+  "agent": "main",
   "skipDangerousModePermissionPrompt": true
 }
