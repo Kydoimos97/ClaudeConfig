@@ -31,9 +31,7 @@ Thinking layer (decisions and reasoning):
 - Socrates: complex decisions, conflicting results, judgment calls requiring deep analysis
 
 Execution layer (action and retrieval):
-1. Mini: tiny in-context rewrite, summarization, classification, .claude config edits
-2. Codex: code implementation, code review, refactoring, technical code judgment
-3. Kiro: retrieval, search, fetch, broad exploration, long-output triage
+- Worker: all execution — code, files, bash, kiro-cli, codex exec, skill invocation
 
 ## Output contract
 
@@ -43,7 +41,7 @@ Return:
 Type: <bug|feature|refactor|research|triage|rewrite|review|config|other>
 
 ## Recommended delegate
-<mini|codex|kiro|socrates>
+<worker|socrates>
 
 ## Reason
 <one to three short sentences>

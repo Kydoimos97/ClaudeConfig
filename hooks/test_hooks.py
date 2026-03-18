@@ -33,6 +33,15 @@ def run_hook(script: Path, payload: dict) -> Tuple[str, int]:
     return result.stdout.strip(), result.returncode
 
 
+def deny_reason(stdout: str) -> str:
+    """Parse hook stdout JSON and return permissionDecisionReason, or empty string."""
+    try:
+        data = json.loads(stdout)
+        return data.get("hookSpecificOutput", {}).get("permissionDecisionReason", "")
+    except (json.JSONDecodeError, AttributeError):
+        return ""
+
+
 def last_commands_log_entry() -> dict | None:
     """Return the last entry from today's commands JSONL log, or None."""
     today = datetime.now().strftime("%Y-%m-%d")
@@ -99,10 +108,10 @@ def test_command_guard_force_push_blocked() -> Tuple[bool, str]:
 
 
 def test_command_guard_nested_rm_blocked() -> Tuple[bool, str]:
-    """Test 5: nested rm in command substitution blocked"""
+    """Test 5: rm in compound && expression blocked"""
     payload = {
         "tool_name": "Bash",
-        "tool_input": {"command": "echo test; $(rm -rf ~)"},
+        "tool_input": {"command": "echo test && rm -rf /tmp/fakedir"},
     }
     stdout, rc = run_hook(HOOKS_DIR / "command-guard.py", payload)
     if "deny" in stdout.lower():
@@ -184,28 +193,28 @@ def test_command_guard_find_xargs_grep_approved() -> Tuple[bool, str]:
     return (False, f"expected allow, got: {stdout[:100]}")
 
 
-def test_command_guard_git_push_continue() -> Tuple[bool, str]:
-    """Test 12: git push without force continues"""
+def test_command_guard_git_push_asks() -> Tuple[bool, str]:
+    """Test 12: git push without force asks for confirmation"""
     payload = {
         "tool_name": "Bash",
         "tool_input": {"command": "git push origin main"},
     }
     stdout, rc = run_hook(HOOKS_DIR / "command-guard.py", payload)
-    if stdout == "":
+    if "ask" in stdout.lower():
         return (True, "")
-    return (False, f"expected empty output, got: {stdout[:100]}")
+    return (False, f"expected ask, got: {stdout[:100]}")
 
 
-def test_command_guard_npm_install_continue() -> Tuple[bool, str]:
-    """Test 13: npm install continues"""
+def test_command_guard_npm_install_approved() -> Tuple[bool, str]:
+    """Test 13: npm install is approved"""
     payload = {
         "tool_name": "Bash",
         "tool_input": {"command": "npm install express"},
     }
     stdout, rc = run_hook(HOOKS_DIR / "command-guard.py", payload)
-    if stdout == "":
+    if "allow" in stdout.lower():
         return (True, "")
-    return (False, f"expected empty output, got: {stdout[:100]}")
+    return (False, f"expected allow, got: {stdout[:100]}")
 
 
 def test_command_guard_unapproved_continues() -> Tuple[bool, str]:
@@ -235,17 +244,16 @@ def test_command_guard_read_tool_pass() -> Tuple[bool, str]:
     entry = last_commands_log_entry()
     if entry is None:
         return (False, "no log entry found")
-    if entry.get("status") != "APPROVED":
-        return (False, f"expected status=APPROVED, got {entry.get('status')!r}")
-    if entry.get("tool") != "Read":
-        return (False, f"expected tool=Read, got {entry.get('tool')!r}")
-    if entry.get("target") != f"{HOME}/.claude/hooks/command-guard.py":
-        return (False, f"expected target=file path, got {entry.get('target')!r}")
+    if entry.get("result", {}).get("decision") != "allow":
+        return (False, f"expected decision=allow, got {entry.get('result', {}).get('decision')!r}")
+    tokens = entry.get("normalized", {}).get("tokens", [])
+    if not tokens or tokens[0].lower() != "read":
+        return (False, f"expected first token=Read, got tokens={tokens!r}")
     return (True, "")
 
 
 def test_command_guard_edit_tool_pass() -> Tuple[bool, str]:
-    """Test 16: Edit tool is auto-approved and logged"""
+    """Test 16: Edit tool on non-policy file is approved and logged"""
     payload = {
         "tool_name": "Edit",
         "tool_input": {
@@ -260,17 +268,35 @@ def test_command_guard_edit_tool_pass() -> Tuple[bool, str]:
     entry = last_commands_log_entry()
     if entry is None:
         return (False, "no log entry found")
-    if entry.get("status") != "APPROVED":
-        return (False, f"expected status=APPROVED, got {entry.get('status')!r}")
-    if entry.get("tool") != "Edit":
-        return (False, f"expected tool=Edit, got {entry.get('tool')!r}")
-    if entry.get("target") != f"{HOME}/.claude/hooks/command-guard.py":
-        return (False, f"expected target=file path, got {entry.get('target')!r}")
+    if entry.get("result", {}).get("decision") != "allow":
+        return (False, f"expected decision=allow, got {entry.get('result', {}).get('decision')!r}")
+    tokens = entry.get("normalized", {}).get("tokens", [])
+    if not tokens or tokens[0].lower() != "edit":
+        return (False, f"expected first token=Edit, got tokens={tokens!r}")
     return (True, "")
 
 
-def test_command_guard_write_tool_pass() -> Tuple[bool, str]:
-    """Test 17: Write tool is deferred (CONTINUE) and logged"""
+def test_command_guard_edit_commands_conf_asks() -> Tuple[bool, str]:
+    """Test 17: Edit tool on commands.conf returns ask"""
+    payload = {
+        "tool_name": "Edit",
+        "tool_input": {
+            "file_path": f"{HOME}/.claude/hooks/resources/commands.conf",
+            "old_string": "[-] rm",
+            "new_string": "[-] rm",
+        },
+    }
+    stdout, rc = run_hook(HOOKS_DIR / "command-guard.py", payload)
+    if "ask" not in stdout.lower():
+        return (False, f"expected ask, got stdout={stdout[:100]!r}, rc={rc}")
+    reason = deny_reason(stdout)
+    if "commands.conf" not in reason.lower() and "policy" not in reason.lower():
+        return (False, f"expected policy hint in reason, got: {reason!r}")
+    return (True, "")
+
+
+def test_command_guard_write_tool_deferred() -> Tuple[bool, str]:
+    """Test 18: Write tool on non-policy file is deferred (no hook output)"""
     payload = {
         "tool_name": "Write",
         "tool_input": {
@@ -284,36 +310,8 @@ def test_command_guard_write_tool_pass() -> Tuple[bool, str]:
     entry = last_commands_log_entry()
     if entry is None:
         return (False, "no log entry found")
-    if entry.get("status") != "CONTINUE":
-        return (False, f"expected status=CONTINUE, got {entry.get('status')!r}")
-    if entry.get("tool") != "Write":
-        return (False, f"expected tool=Write, got {entry.get('tool')!r}")
-    if entry.get("target") != "/tmp/test_output.txt":
-        return (False, f"expected target=/tmp/test_output.txt, got {entry.get('target')!r}")
-    return (True, "")
-
-
-def test_command_guard_webfetch_tool_pass() -> Tuple[bool, str]:
-    """Test 18: WebFetch tool is deferred (CONTINUE) and logged"""
-    payload = {
-        "tool_name": "WebFetch",
-        "tool_input": {
-            "url": "https://docs.anthropic.com/en/docs/claude-code",
-            "prompt": "What hooks are supported?",
-        },
-    }
-    stdout, rc = run_hook(HOOKS_DIR / "command-guard.py", payload)
-    if stdout != "" or rc != 0:
-        return (False, f"expected silent pass, got stdout={stdout[:100]!r}, rc={rc}")
-    entry = last_commands_log_entry()
-    if entry is None:
-        return (False, "no log entry found")
-    if entry.get("status") != "CONTINUE":
-        return (False, f"expected status=CONTINUE, got {entry.get('status')!r}")
-    if entry.get("tool") != "WebFetch":
-        return (False, f"expected tool=WebFetch, got {entry.get('tool')!r}")
-    if entry.get("target") != "https://docs.anthropic.com/en/docs/claude-code":
-        return (False, f"expected target=URL, got {entry.get('target')!r}")
+    if entry.get("result", {}).get("decision") != "defer":
+        return (False, f"expected decision=defer, got {entry.get('result', {}).get('decision')!r}")
     return (True, "")
 
 
@@ -404,6 +402,97 @@ def test_track_agent_tokens_valid() -> Tuple[bool, str]:
     return (True, "")
 
 
+def test_rm_hint_contains_trash() -> Tuple[bool, str]:
+    """Test 25: rm deny reason contains Trash guidance"""
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "rm -rf /tmp/old_dir"},
+    }
+    stdout, _ = run_hook(HOOKS_DIR / "command-guard.py", payload)
+    reason = deny_reason(stdout)
+    if "Trash" not in reason:
+        return (False, f"expected 'Trash' in deny reason, got: {reason!r}")
+    return (True, "")
+
+
+def test_rm_no_args_hint() -> Tuple[bool, str]:
+    """Test 26: rm with no extra args gets hint from bare rm rule"""
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "rm somefile.txt"},
+    }
+    stdout, _ = run_hook(HOOKS_DIR / "command-guard.py", payload)
+    reason = deny_reason(stdout)
+    if "Trash" not in reason:
+        return (False, f"expected 'Trash' in deny reason, got: {reason!r}")
+    return (True, "")
+
+
+def test_sudo_hint() -> Tuple[bool, str]:
+    """Test 27: sudo deny reason mentions uv run / task"""
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "sudo apt install vim"},
+    }
+    stdout, _ = run_hook(HOOKS_DIR / "command-guard.py", payload)
+    reason = deny_reason(stdout)
+    if "uv run" not in reason and "task" not in reason:
+        return (False, f"expected 'uv run' or 'task' in deny reason, got: {reason!r}")
+    return (True, "")
+
+
+def test_force_push_hint() -> Tuple[bool, str]:
+    """Test 28: git push --force deny reason mentions PR"""
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "git push --force origin main"},
+    }
+    stdout, _ = run_hook(HOOKS_DIR / "command-guard.py", payload)
+    reason = deny_reason(stdout)
+    if "PR" not in reason:
+        return (False, f"expected 'PR' in deny reason, got: {reason!r}")
+    return (True, "")
+
+
+def test_git_add_dot_hint() -> Tuple[bool, str]:
+    """Test 29: git add . deny reason mentions specific files"""
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "git add ."},
+    }
+    stdout, _ = run_hook(HOOKS_DIR / "command-guard.py", payload)
+    reason = deny_reason(stdout)
+    if "specific" not in reason.lower():
+        return (False, f"expected 'specific' in deny reason, got: {reason!r}")
+    return (True, "")
+
+
+def test_python_m_hint() -> Tuple[bool, str]:
+    """Test 30: python -m deny reason mentions uv run"""
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "python -m pip install requests"},
+    }
+    stdout, _ = run_hook(HOOKS_DIR / "command-guard.py", payload)
+    reason = deny_reason(stdout)
+    if "uv run" not in reason:
+        return (False, f"expected 'uv run' in deny reason, got: {reason!r}")
+    return (True, "")
+
+
+def test_killall_hint() -> Tuple[bool, str]:
+    """Test 31: killall deny reason mentions kill <pid>"""
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {"command": "killall python"},
+    }
+    stdout, _ = run_hook(HOOKS_DIR / "command-guard.py", payload)
+    reason = deny_reason(stdout)
+    if "kill" not in reason.lower():
+        return (False, f"expected 'kill' in deny reason, got: {reason!r}")
+    return (True, "")
+
+
 def test_track_agent_tokens_non_agent() -> Tuple[bool, str]:
     """Test 24: track-agent-tokens with non-agent PostToolUse"""
     payload = {
@@ -437,19 +526,26 @@ def main() -> None:
         ("9. git status approved", test_command_guard_git_status_approved),
         ("10. ls | head approved", test_command_guard_ls_pipe_head_approved),
         ("11. find | xargs | grep approved", test_command_guard_find_xargs_grep_approved),
-        ("12. git push continues", test_command_guard_git_push_continue),
-        ("13. npm install continues", test_command_guard_npm_install_continue),
+        ("12. git push asks", test_command_guard_git_push_asks),
+        ("13. npm install approved", test_command_guard_npm_install_approved),
         ("14. unapproved segment continues", test_command_guard_unapproved_continues),
-        ("15. Read tool pass", test_command_guard_read_tool_pass),
-        ("16. Edit tool pass", test_command_guard_edit_tool_pass),
-        ("17. Write tool pass", test_command_guard_write_tool_pass),
-        ("18. WebFetch tool pass", test_command_guard_webfetch_tool_pass),
+        ("15. Read tool approved", test_command_guard_read_tool_pass),
+        ("16. Edit tool approved (non-policy file)", test_command_guard_edit_tool_pass),
+        ("17. Edit commands.conf asks", test_command_guard_edit_commands_conf_asks),
+        ("18. Write tool deferred", test_command_guard_write_tool_deferred),
         ("19. dispatcher beebop PreToolUse", test_hook_dispatcher_beebop_pretooluse),
         ("20. dispatcher beebop SessionStart", test_hook_dispatcher_beebop_sessionstart),
         ("21. dispatcher unknown agent fallback", test_hook_dispatcher_unknown_agent),
         ("22. dispatcher no event", test_hook_dispatcher_no_event),
         ("23. track-agent-tokens valid", test_track_agent_tokens_valid),
         ("24. track-agent-tokens non-agent", test_track_agent_tokens_non_agent),
+        ("25. rm hint contains Trash", test_rm_hint_contains_trash),
+        ("26. rm no-args hint", test_rm_no_args_hint),
+        ("27. sudo hint mentions uv run", test_sudo_hint),
+        ("28. git push --force hint mentions PR", test_force_push_hint),
+        ("29. git add . hint mentions specific files", test_git_add_dot_hint),
+        ("30. python -m hint mentions uv run", test_python_m_hint),
+        ("31. killall hint mentions kill", test_killall_hint),
     ]
 
     passed = 0

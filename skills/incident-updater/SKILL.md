@@ -11,6 +11,22 @@ description: >
 Applies a triage schema to Datadog cleanly. Deduplicates, reassigns bot items,
 handles merges, and never creates [AI] todos as assigned human tasks.
 
+## Tool Execution Model
+
+Main runs puppy and gh. Kiro handles git and source code review.
+
+`uv run puppy` and `gh` are Windows-only — Kiro cannot run them. For every puppy command:
+
+1. Main runs via Bash: `uv run puppy <cmd> > /tmp/puppy_out.txt 2>&1`
+2. Check size: `ls -lh /tmp/puppy_out.txt`
+3. Small (<20KB): invoke summarizer with the file path to compress findings
+4. Large (>=20KB): invoke Kiro with the file path for full triage
+
+Kiro CAN run git directly against Windows repos:
+`env GIT_DISCOVERY_ACROSS_FILESYSTEM=1 git -C /mnt/c/<repo-path> <subcommand>`
+
+Use Kiro for all source code review, git log, and file reads via `/mnt/c/` paths.
+
 ## Input Contract
 
 Required:

@@ -6,13 +6,6 @@
   },
   "permissions": {
     "allow": [
-      "Read(./**)",
-      "Edit(./**)",
-      "Write(./**)",
-      "Read",
-      "Read(**)",
-      "Glob(**)",
-      "Grep(**)",
       "WebSearch",
       "WebFetch(domain:wrench.ai)",
       "WebFetch(domain:web.wrench.ai)",
@@ -30,30 +23,8 @@
       "WebFetch(domain:workos.com)",
       "WebFetch(domain:docs.stripe.com)"
     ],
-    "deny": [
-      "Bash(python *)",
-      "Bash(python3 *)",
-      "Bash(py *)"
-    ],
-    "ask": [
-      "Bash(git add *)",
-      "Bash(git commit *)",
-      "Bash(git push *)",
-      "Bash(git pull *)",
-      "Bash(git merge *)",
-      "Bash(git rebase *)",
-      "Bash(git reset *)",
-      "Bash(uv add *)",
-      "Bash(uv remove *)",
-      "Bash(npm install *)",
-      "Bash(npm ci *)",
-      "Bash(terraform apply *)",
-      "Bash(terraform destroy *)",
-      "Bash(docker run *)",
-      "Bash(docker push *)",
-      "Bash(rm -rf *)",
-      "Bash(wget *)"
-    ],
+    "deny": [],
+    "ask": [],
     "defaultMode": "dontAsk"
   },
   "hooks": {
@@ -149,6 +120,6 @@
       "Processing"
     ]
   },
-  "agent": "beebop",
+  "agent": "main",
   "skipDangerousModePermissionPrompt": true
 }
