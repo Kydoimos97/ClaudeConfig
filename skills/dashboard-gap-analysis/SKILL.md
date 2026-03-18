@@ -13,6 +13,22 @@ Checks whether the Platform Health Dashboard is showing any active signals not c
 by an open incident. This is the recurring review — run daily or whenever you want a
 platform health snapshot.
 
+## Tool Execution Model
+
+Main runs puppy and gh. Kiro handles git and source code review.
+
+`uv run puppy` and `gh` are Windows-only — Kiro cannot run them. For every puppy command:
+
+1. Main runs via Bash: `uv run puppy <cmd> > /tmp/puppy_out.txt 2>&1`
+2. Check size: `ls -lh /tmp/puppy_out.txt`
+3. Small (<20KB): invoke summarizer with the file path to compress findings
+4. Large (>=20KB): invoke Kiro with the file path for full triage
+
+Kiro CAN run git directly against Windows repos:
+`env GIT_DISCOVERY_ACROSS_FILESYSTEM=1 git -C /mnt/c/<repo-path> <subcommand>`
+
+Use Kiro for all source code review, git log, and file reads via `/mnt/c/` paths.
+
 ## Inputs
 
 | Input | Default | Description |
@@ -24,7 +40,7 @@ platform health snapshot.
 
 ## Workflow
 
-### Step 1: Fetch open incidents (delegate to Kiro)
+### Step 1: Fetch open incidents
 
 ```bash
 uv run puppy incident list --limit 100 --format json
@@ -33,7 +49,7 @@ uv run puppy incident list --limit 100 --format json
 Build a set of open incident titles and services. This is used in Step 4 to check
 whether an active signal already has a declared incident.
 
-### Step 2: Query current metric state (delegate to Kiro)
+### Step 2: Query current metric state
 
 For each key signal group, query current values using the Datadog metrics API
 (raw requests with auth from `load_config()`). Use `active_window` for current state,
@@ -67,7 +83,7 @@ Determine current state:
 - **elevated**: `latest > mean + 1*stddev`
 - **anomalous**: `latest > mean + 2*stddev` OR sustained error rate > 3% for > 30 min
 
-### Step 3: Check logs for active error volume (delegate to Kiro)
+### Step 3: Check logs for active error volume
 
 ```bash
 uv run puppy logs search "status:error" --from 1h --limit 20

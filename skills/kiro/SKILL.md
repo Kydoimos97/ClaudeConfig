@@ -22,26 +22,44 @@ wsl -d Ubuntu bash -lc "kiro-cli chat --no-interactive --trust-all-tools \"<full
 hang. The prompt must be fully self-contained: role, exact goal, output format,
 and explicit instruction not to dump raw content.
 
+Always pass a timeout to the Bash tool when invoking kiro-cli — it can hang
+indefinitely if the model loops or stalls. Recommended: `timeout: 120000`
+(2 minutes) for fetch/triage, `timeout: 180000` (3 minutes) for discovery or
+research. If the command times out, check whether output was partially written
+before retrying.
+
 ## Capabilities and limits
 
 Kiro CAN:
-- Read any file on Windows drives via `/mnt/c/`, `/mnt/d/` etc.
+- Read any file on Windows drives via `/mnt/c/`, `/mnt/d/` etc. (live confirmed)
 - Run web searches and fetch URLs
 - grep, glob, ls, stat within any path
-- Read the project repo, config files, logs
+- Run read-only git commands against Windows repos — use WSL-native `git` with:
+  `env GIT_DISCOVERY_ACROSS_FILESYSTEM=1 git -C /mnt/c/<repo-path> <subcommand>`
+  (live confirmed: log, diff, branch, show all work)
+- Run read-only `gh.exe` lookups — PR list/view/checks, issue list/view, repo view,
+  run list/view, release list/view. Full path: `/mnt/c/Program Files/GitHub CLI/gh.exe`
+  or just `gh.exe` if on PATH. (allowedCommands configured)
 
 Kiro CANNOT:
 - Write to Windows drives (`/mnt/[a-z]/` writes are denied by sandbox)
-- Run `task`, `uv`, `pytest`, or any build/test tooling
+- Run `task`, `uv`, `pytest`, `uv run puppy`, or any build/test tooling
+- Run `git.exe` — Windows git binary cannot interpret `/mnt/c/` paths (use WSL git)
+- Run any `gh.exe` command that mutates state (create, merge, close, edit)
 - Execute anything that mutates state
 
-For execution tasks, use Codex.
+For execution tasks (puppy, gh writes, uv), main runs them directly via Bash.
 
 ## Quirks
 
 - Kiro runs in WSL Ubuntu. The working directory for shell commands defaults
   to the WSL home (`~`). Always pass full `/mnt/c/...` paths when referencing
-  project files, or `cd` explicitly in the prompt.
+  project files, or `-C /mnt/c/...` for git commands.
+- Git requires `GIT_DISCOVERY_ACROSS_FILESYSTEM=1` to cross the WSL/Windows mount
+  boundary — always prefix git commands with `env GIT_DISCOVERY_ACROSS_FILESYSTEM=1`.
+- `git.exe` is reachable at `/mnt/c/Program Files/Git/mingw64/bin/git.exe` but
+  cannot handle `/mnt/c/` paths — use WSL-native `git` exclusively.
+- `gh.exe` is at `/mnt/c/Program Files/GitHub CLI/gh.exe` and is on the WSL PATH.
 - The `--trust-all-tools` flag is not a security bypass — Kiro's sandbox
   already enforces the allow/deny lists in `~/.kiro/agents/default.json`.
 - Web search results are Kiro's own model output — verify facts against known

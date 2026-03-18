@@ -85,6 +85,12 @@ codex exec \
 
 Prompt must include: exact goal, scope boundaries, explicit exclusions, required output format.
 
+Always pass a timeout to the Bash tool — Codex can loop indefinitely on large
+tasks. Recommended: `timeout: 180000` (3 minutes) for small patches,
+`timeout: 300000` (5 minutes) for multi-file implementation. If the command
+times out, check `/tmp/codex-implement-output.txt` for partial output before
+deciding whether to retry or split the task.
+
 Output contract:
 
 ## Implementation Summary
