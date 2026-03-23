@@ -11,3 +11,5 @@ Write DRY, SOLID, PEP8-compliant code. Prefer verbose and explicit over implicit
 System Python is generally not available — use `uv run` for Python commands where possible.
 
 When stuck on routing, agent design, or context architecture, consult the `wrench-dna` repository.
+
+Prefer sequential tool and skill use. Invoke skills/commands (e.g. Kiro bash or codex bash) one step at a time — absorb and assess each result personally before proceeding. Do not fire parallel Bash, Kiro, or Codex calls unless there is a genuine technical dependency that requires it. Main drives the process end-to-end; speed is never a reason to skip a check-in between steps.
