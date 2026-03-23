@@ -23,7 +23,7 @@ import sys
 import time
 import traceback
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Optional
@@ -67,6 +67,7 @@ class Token:
 class Specificity:
     literal_count: int
     weight_vector: list[str]
+    content_score: int = 0
 
 
 @dataclass
@@ -108,6 +109,37 @@ def parse_token(raw: str) -> Token:
     return Token(type=TokenType.LITERAL, value=raw.lower())
 
 
+def _token_content_score(token: Token) -> int:
+    """Score a single rule token by the semantic content it constrains.
+
+    Scoring tiers (highest to lowest):
+      URL-bearing wildcard_in_arg (contains ://)        → 100
+      Extension-bearing wildcard_in_arg (e.g. *.exe)   →  50
+      Non-flag content wildcard_in_arg                  →  20
+      Literal token                                     →  10
+      Flag-like wildcard_in_arg (starts with -)         →   0
+      Pure wildcard (*, **, ?)                          →   0
+
+    This mirrors the dimension-aware model used for tool rules: a rule that
+    constrains a network target or file extension is more relevant than one
+    that constrains a flag like -d or --output, even if the flag rule has
+    more literal tokens.
+    """
+    if token.type == TokenType.LITERAL:
+        return 10
+    if token.type == TokenType.WILDCARD_IN_ARG:
+        val = token.value  # already lowercased
+        if "://" in val:
+            return 100
+        dot = val.rfind(".")
+        if dot >= 0 and "*" not in val[dot:] and "?" not in val[dot:]:
+            return 50
+        if not val.startswith("-"):
+            return 20
+        return 0
+    return 0
+
+
 def compute_specificity(tokens: list[Token]) -> Specificity:
     weight_map = {
         TokenType.LITERAL: "literal",
@@ -119,6 +151,7 @@ def compute_specificity(tokens: list[Token]) -> Specificity:
     return Specificity(
         literal_count=sum(1 for t in tokens if t.type == TokenType.LITERAL),
         weight_vector=[weight_map[t.type] for t in tokens],
+        content_score=sum(_token_content_score(t) for t in tokens),
     )
 
 
@@ -163,8 +196,6 @@ def _parse_bash_rule(stripped: str, prefix: str, action: Action, line_num: int) 
     parts = pattern_str.lower().split()
     if not parts:
         raise ValueError(f"Line {line_num}: empty pattern")
-    if parts.count("**") > 1:
-        raise ValueError(f"Line {line_num}: only one ** per rule allowed")
     tokens = [parse_token(p) for p in parts]
     normalized = tokens_to_normalized(tokens)
     return Rule(
@@ -286,6 +317,7 @@ def _rule_to_dict(rule: Rule) -> dict:
         "specificity": {
             "literal_count": rule.specificity.literal_count,
             "weight_vector": rule.specificity.weight_vector,
+            "content_score": rule.specificity.content_score,
         },
     }
     if rule.hint is not None:
@@ -298,7 +330,7 @@ def compile_conf(conf_path: Path) -> dict:
     index = build_index(bash_rules)
     return {
         "version": SCHEMA_VERSION,
-        "compiled_at": datetime.now(timezone.utc).isoformat(),
+        "compiled_at": datetime.now().isoformat(),
         "source": {
             "path": str(conf_path),
             "mtime": conf_path.stat().st_mtime,
@@ -337,6 +369,7 @@ def _rules_from_compiled(compiled: dict) -> tuple[list[Rule], dict[str, list[int
             specificity=Specificity(
                 literal_count=rd["specificity"]["literal_count"],
                 weight_vector=rd["specificity"]["weight_vector"],
+                content_score=rd["specificity"].get("content_score", 0),
             ),
             hint=rd.get("hint"),
         ))
@@ -401,6 +434,12 @@ def _match_single(token: Token, arg: str) -> bool:
     if token.type == TokenType.WILDCARD_CHAR:
         return len(arg) == 1
     if token.type == TokenType.WILDCARD_IN_ARG:
+        # Defensive: bare key=value args (e.g. core.pager=cat from git -c)
+        # should not accidentally match extension globs like *.env.
+        # Only blocked when the pattern itself doesn't contain = (so dd of=*
+        # still works — both sides have =).
+        if "=" in a and not a.startswith("-") and "=" not in token.value:
+            return False
         return fnmatch.fnmatchcase(a, token.value)
     return False  # wildcard_multi is handled one level up
 
@@ -410,7 +449,7 @@ def _match_tokens(ptokens: list[Token], itokens: list[str], pi: int = 0, ii: int
         pt = ptokens[pi]
         if pt.type == TokenType.WILDCARD_MULTI:
             remaining = len(itokens) - ii
-            for count in range(remaining, 0, -1):  # greedy: try most first
+            for count in range(remaining, -1, -1):  # greedy 0+: try most first, 0 = skip
                 if _match_tokens(ptokens, itokens, pi + 1, ii + count):
                     return True
             return False
@@ -419,6 +458,9 @@ def _match_tokens(ptokens: list[Token], itokens: list[str], pi: int = 0, ii: int
             ii += 1
         else:
             return False
+    # Input exhausted — trailing ** tokens can each match zero and be skipped
+    while pi < len(ptokens) and ptokens[pi].type == TokenType.WILDCARD_MULTI:
+        pi += 1
     return pi == len(ptokens) and ii == len(itokens)
 
 
@@ -426,8 +468,10 @@ _ACTION_PRIORITY: dict[Action, int] = {Action.DENY: 2, Action.ASK: 1, Action.ALL
 
 
 def _beats(challenger: Rule, current: Rule) -> bool:
-    if challenger.specificity.literal_count != current.specificity.literal_count:
-        return challenger.specificity.literal_count > current.specificity.literal_count
+    cs = challenger.specificity.content_score
+    cu = current.specificity.content_score
+    if cs != cu:
+        return cs > cu
     return _ACTION_PRIORITY[challenger.action] > _ACTION_PRIORITY[current.action]
 
 
@@ -495,6 +539,69 @@ def evaluate_bash(
 # Matching engine — tool rules
 # ---------------------------------------------------------------------------
 
+def _pattern_extension(pattern: str) -> Optional[str]:
+    """Return the explicit file extension from a glob pattern, or None.
+
+    An extension is explicit when the last path segment ends with a literal
+    dot-suffix that contains no wildcard characters (e.g. ``*.exe`` → ``.exe``,
+    ``$USERPROFILE\\**\\*.ps1`` → ``.ps1``, ``$USERPROFILE\\**`` → None).
+    Multi-extension patterns (``*.tar.gz``) return only the final extension
+    (``.gz``); the literal-char path_score tiebreaker correctly ranks a
+    ``*.tar.gz`` rule above a ``*.gz`` rule when both match the same target.
+    """
+    last_seg = pattern.replace("\\", "/").split("/")[-1]
+    dot_pos = last_seg.rfind(".")
+    if dot_pos < 0:
+        return None
+    ext = last_seg[dot_pos:]
+    if "*" in ext or "?" in ext:
+        return None
+    return ext.lower()
+
+
+def _target_extension(target: str) -> Optional[str]:
+    """Return the file extension of a target path, lowercased, or None."""
+    _, ext = os.path.splitext(target)
+    return ext.lower() if ext else None
+
+
+def _path_literal_count(pattern: str) -> int:
+    """Count non-wildcard characters in a path pattern."""
+    return sum(1 for c in pattern if c not in ("*", "?"))
+
+
+def _tool_rule_score(rule: ToolRule, target: str) -> int:
+    """Compute a dimension-aware specificity score for a matched tool rule.
+
+    Scoring dimensions (highest to lowest priority):
+
+      extension_score  — 1 when the rule explicitly constrains the file
+                         extension AND that extension matches the target;
+                         weighted at 1000 so an extension-specific rule
+                         always beats a path-only rule of equal or lesser
+                         path depth.
+      path_score       — count of non-wildcard characters in the path
+                         pattern, weighted at 10.  Longer literal prefixes
+                         rank higher within the same extension class.
+      action_priority  — deny (2) > ask (1) > allow (0) as the final
+                         tiebreaker when two rules are otherwise equal.
+
+    Rules without a path pattern score only their action_priority so they
+    always lose to any pattern rule.
+
+    Note: at ~100+ literal chars the path component overtakes the extension
+    weight (100 * 10 = 1000).  This is intentional — a near-literal absolute
+    path is genuinely more specific than a bare extension glob.
+    """
+    if rule.path_pattern is None:
+        return _ACTION_PRIORITY[rule.action]
+    pat_ext = _pattern_extension(rule.path_pattern)
+    tgt_ext = _target_extension(target)
+    extension_score = 1 if (pat_ext is not None and pat_ext == tgt_ext) else 0
+    path_score = _path_literal_count(rule.path_pattern)
+    return extension_score * 1000 + path_score * 10 + _ACTION_PRIORITY[rule.action]
+
+
 def evaluate_tool(
     tool_rules: list[ToolRule],
     tool_name: str,
@@ -517,8 +624,7 @@ def evaluate_tool(
                         file=sys.stderr,
                     )
                 continue
-        # Specificity: path_pattern present beats absent; tie-break by action
-        score = (1 if rule.path_pattern else 0) * 10 + _ACTION_PRIORITY[rule.action]
+        score = _tool_rule_score(rule, target.lower())
         if winner is None or score > winner_score:
             winner = rule
             winner_score = score
@@ -536,9 +642,13 @@ def evaluate_tool(
 # ---------------------------------------------------------------------------
 
 def normalize(command: str) -> str:
-    """Normalize command by removing Claude Code path rewrites."""
+    """Normalize command by stripping Claude Code path rewrites.
+
+    The git -C flag normalization that used to live here has been removed —
+    ** now matches zero-or-more tokens, so conf rules like ``git ** status **``
+    handle ``git -C /repo status`` natively without code-level special-casing.
+    """
     command = command.strip()
-    command = re.sub(r'git\s+-C\s+["\']?/[^"\']*["\']?\s+', "git ", command)
     command = re.sub(r'cd\s+["\']?/[^"\']*["\']?\s+&&\s+', "", command)
     return command
 
@@ -664,7 +774,7 @@ def log_decision(
         return
 
     entry: dict = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now().isoformat(),
         "version": SCHEMA_VERSION,
         "event": event,
         "normalized": {"command": normalized_command, "tokens": normalized_tokens},
@@ -688,7 +798,7 @@ def log_decision(
 def log_error(error: str, raw_input: str = "") -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     entry = {
-        "ts": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "timestamp": datetime.now().isoformat(),
         "hook": "command-guard",
         "error": error,
         "input": raw_input[:500] if raw_input else None,
@@ -717,6 +827,48 @@ def _tool_target(tool_name: str, tool_input: dict) -> str:
         if isinstance(v, str) and v:
             return v[:80]
     return ""
+
+
+_NON_INTERACTIVE_MODES: frozenset[str] = frozenset({"dontAsk", "bypassPermissions"})
+
+_DONT_ASK_DENY_REASON: str = (
+    "Permission to use this command has been denied because Claude Code is running in "
+    "don't ask mode. "
+    "IMPORTANT: You *may* attempt to accomplish this action using other tools that might "
+    "naturally be used to accomplish this goal, e.g. using head instead of cat. "
+    "But you *should not* attempt to work around this denial in malicious ways, e.g. do "
+    "not use your ability to run tests to execute non-test actions. You should only try "
+    "to work around this restriction in reasonable ways that do not attempt to bypass the "
+    "intent behind this denial. If you believe this capability is essential to complete a "
+    "specified task try to finish any other outstanding tasks and inform the user of the "
+    "blocker you ran into at the end of your run."
+)
+
+
+def _effective_decision(
+    decision: str, event: str, permission_mode: str
+) -> tuple[str, Optional[str]]:
+    """Escalate 'ask' to 'deny' when the session cannot surface a prompt.
+
+    Returns (final_decision, reason_override).  reason_override is non-None
+    only when the escalation adds its own explanation; callers should use it
+    in place of the rule's hint when present.
+
+    Two conditions require silent escalation to deny:
+    - PermissionRequest event: the hook is acting as a permission fallback
+      and 'ask' is not a valid response for that event.  The rule's own hint
+      is kept as the reason.
+    - Non-interactive permission mode (dontAsk, bypassPermissions): Claude
+      will not pause to confirm, so leaving 'ask' in place silently bypasses
+      the guard intent.  A dedicated guidance message is returned so Claude
+      understands why it was blocked and how to proceed.
+    """
+    if decision == "ask":
+        if event == "PermissionRequest":
+            return "deny", None
+        if permission_mode in _NON_INTERACTIVE_MODES:
+            return "deny", _DONT_ASK_DENY_REASON
+    return decision, None
 
 
 def _emit(decision: str, reason: Optional[str], event: str) -> dict:
@@ -999,6 +1151,7 @@ def _handle_tool(
     tool_rules: list[ToolRule],
     event: str,
     debug: bool,
+    permission_mode: str = "default",
 ) -> None:
     tool_name = payload.get("tool_name", "") or ""
     tool_input = payload.get("tool_input") or {}
@@ -1023,11 +1176,11 @@ def _handle_tool(
         )
         return
 
-    decision = winner.action.value
-    if decision == "ask" and event == "PermissionRequest":
-        decision = "deny"
+    decision, reason_override = _effective_decision(winner.action.value, event, permission_mode)
 
-    if decision in ("deny", "ask"):
+    if reason_override is not None:
+        reason = reason_override
+    elif decision in ("deny", "ask"):
         reason = winner.hint or winner.raw
     else:
         reason = winner.hint
@@ -1055,6 +1208,7 @@ def _handle_bash(
     index: dict[str, list[int]],
     event: str,
     debug: bool,
+    permission_mode: str = "default",
 ) -> None:
     tool_input = payload.get("tool_input") or {}
     raw_command = tool_input.get("command", "").strip()
@@ -1090,10 +1244,10 @@ def _handle_bash(
     # --- Pre-check 2: raw pass — catches compound deny rules (redirects, etc.) ---
     raw_winner = _raw_pass(raw_tokens, bash_rules, index, debug)
     if raw_winner is not None:
-        decision = raw_winner.action.value
-        if decision == "ask" and event == "PermissionRequest":
-            decision = "deny"
-        if decision in ("deny", "ask"):
+        decision, reason_override = _effective_decision(raw_winner.action.value, event, permission_mode)
+        if reason_override is not None:
+            reason = reason_override
+        elif decision in ("deny", "ask"):
             reason = raw_winner.hint or raw_winner.raw
         else:
             reason = raw_winner.hint
@@ -1120,36 +1274,46 @@ def _handle_bash(
         msg = f"tree-sitter not installed — run: pip install tree-sitter tree-sitter-bash ({exc})"
         log_error(msg)
         _notify_error(msg)
+        deny_reason = (
+            "tree-sitter is not installed so compound Bash commands cannot be safely "
+            "evaluated and are being denied. Inform the user that all Bash tool calls "
+            "will be denied until the missing dependencies are installed: "
+            "pip install tree-sitter tree-sitter-bash"
+        )
+        output = _emit("deny", deny_reason, event)
         log_decision(
             event=event,
             raw_input=payload,
             normalized_command=command,
             normalized_tokens=command.split(),
-            decision="defer",
+            decision="deny",
             source="default",
             rule_id=None,
             reason="tree-sitter missing",
             rules_evaluated=0,
             rules_matched=0,
             evaluations=[],
-            output_payload=None,
+            output_payload=output,
         )
         return
 
     if not sub_commands:
+        fallback_decision, fallback_reason = _effective_decision("ask", event, permission_mode)
+        reason = fallback_reason or "no commands in parse tree — requires approval"
+        output = _emit(fallback_decision, reason, event)
         log_decision(
             event=event,
             raw_input=payload,
             normalized_command=command,
             normalized_tokens=command.split(),
-            decision="defer",
+            decision=fallback_decision,
             source="default",
             rule_id=None,
             reason="no commands in parse tree",
             rules_evaluated=0,
             rules_matched=0,
             evaluations=[],
-            output_payload=None,
+            output_payload=output,
         )
         return
 
@@ -1167,6 +1331,10 @@ def _handle_bash(
         tokens = cleaned.lower().split()
         if not tokens:
             continue
+        # Skip degenerate nodes: bare line-continuation backslashes, lone
+        # punctuation, or other non-command artifacts from tree-sitter.
+        if all(t.strip("\\") == "" for t in tokens):
+            continue
 
         winner, n_eval, n_match, evals = evaluate_bash(bash_rules, index, tokens, debug=debug)
         total_evaluated += n_eval
@@ -1174,20 +1342,23 @@ def _handle_bash(
         all_evals.extend(evals)
 
         if winner is None:
-            # One sub-command has no matching rule — defer the whole compound
+            # One sub-command has no matching rule — ask for approval
+            fallback_decision, fallback_reason = _effective_decision("ask", event, permission_mode)
+            reason = fallback_reason or f"no rule matched: {tokens[0][:60]} — requires approval"
+            output = _emit(fallback_decision, reason, event)
             log_decision(
                 event=event,
                 raw_input=payload,
                 normalized_command=command,
                 normalized_tokens=tokens,
-                decision="defer",
+                decision=fallback_decision,
                 source="default",
                 rule_id=None,
                 reason=f"no rule matched: {tokens[0][:60]}",
                 rules_evaluated=total_evaluated,
                 rules_matched=total_matched,
                 evaluations=all_evals,
-                output_payload=None,
+                output_payload=output,
             )
             return
 
@@ -1201,27 +1372,30 @@ def _handle_bash(
             governing_tokens = tokens
 
     if governing is None:
+        fallback_decision, fallback_reason = _effective_decision("ask", event, permission_mode)
+        reason = fallback_reason or "evaluation produced no winner — requires approval"
+        output = _emit(fallback_decision, reason, event)
         log_decision(
             event=event,
             raw_input=payload,
             normalized_command=command,
             normalized_tokens=command.split(),
-            decision="defer",
+            decision=fallback_decision,
             source="default",
             rule_id=None,
             reason="evaluation produced no winner",
             rules_evaluated=total_evaluated,
             rules_matched=total_matched,
             evaluations=all_evals,
-            output_payload=None,
+            output_payload=output,
         )
         return
 
-    decision = governing.action.value
-    if decision == "ask" and event == "PermissionRequest":
-        decision = "deny"
+    decision, reason_override = _effective_decision(governing.action.value, event, permission_mode)
 
-    if decision in ("deny", "ask"):
+    if reason_override is not None:
+        reason = reason_override
+    elif decision in ("deny", "ask"):
         reason = governing.hint or governing.raw
     else:
         reason = governing.hint
@@ -1271,6 +1445,7 @@ def main() -> None:
 
     event = payload.get("hook_event_name") or "PreToolUse"
     tool_name = payload.get("tool_name", "") or ""
+    permission_mode = payload.get("permission_mode") or "default"
 
     if not tool_name:
         return
@@ -1279,15 +1454,15 @@ def main() -> None:
 
     if args.debug:
         print(
-            f"[debug] event={event} tool={tool_name}"
+            f"[debug] event={event} tool={tool_name} permission_mode={permission_mode}"
             f" bash_rules={len(bash_rules)} tool_rules={len(tool_rules)}",
             file=sys.stderr,
         )
 
     if tool_name == "Bash":
-        _handle_bash(payload, bash_rules, index, event, args.debug)
+        _handle_bash(payload, bash_rules, index, event, args.debug, permission_mode)
     else:
-        _handle_tool(payload, tool_rules, event, args.debug)
+        _handle_tool(payload, tool_rules, event, args.debug, permission_mode)
 
 
 if __name__ == "__main__":
