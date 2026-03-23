@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Standalone test script for all Python hooks."""
 
+import importlib.util
 import json
 import os
 import shutil
@@ -512,6 +513,91 @@ def test_track_agent_tokens_non_agent() -> Tuple[bool, str]:
     return (False, f"expected silent pass, got stdout={stdout}, rc={rc}")
 
 
+def _load_command_guard():
+    """Import command-guard.py as a module for direct unit testing."""
+    spec = importlib.util.spec_from_file_location(
+        "command_guard", HOOKS_DIR / "command-guard.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _make_tool_rule(cg, rule_id: str, action_str: str, pattern: str):
+    """Build a ToolRule with tool_name='write' for scoring unit tests."""
+    return cg.ToolRule(
+        id=rule_id,
+        line=0,
+        raw="",
+        action=cg.Action(action_str),
+        tool_name="write",
+        path_pattern=pattern.lower(),
+        hint=None,
+    )
+
+
+def test_tool_scoring_ext_beats_path_allow() -> Tuple[bool, str]:
+    """Test 32: *.exe deny beats USERPROFILE/** allow (extension beats path length)"""
+    cg = _load_command_guard()
+    userprofile = os.environ.get("USERPROFILE", os.path.expanduser("~")).replace("/", "\\")
+    rules = [
+        _make_tool_rule(cg, "r_deny", "deny", "*.exe"),
+        _make_tool_rule(cg, "r_allow", "allow", userprofile + "\\**"),
+    ]
+    target = userprofile + "\\test.exe"
+    winner = cg.evaluate_tool(rules, "Write", target)
+    if winner is None or winner.action != cg.Action.DENY:
+        action_str = winner.action if winner else "None"
+        return (False, f"expected DENY, got {action_str}")
+    return (True, "")
+
+
+def test_tool_scoring_path_plus_ext_beats_ext_only() -> Tuple[bool, str]:
+    """Test 33: USERPROFILE/**/*.exe allow beats *.exe deny (path+ext > ext-only)"""
+    cg = _load_command_guard()
+    userprofile = os.environ.get("USERPROFILE", os.path.expanduser("~")).replace("/", "\\")
+    rules = [
+        _make_tool_rule(cg, "r_deny", "deny", "*.exe"),
+        _make_tool_rule(cg, "r_allow", "allow", userprofile + "\\**\\*.exe"),
+    ]
+    target = userprofile + "\\project\\app.exe"
+    winner = cg.evaluate_tool(rules, "Write", target)
+    if winner is None or winner.action != cg.Action.ALLOW:
+        action_str = winner.action if winner else "None"
+        return (False, f"expected ALLOW, got {action_str}")
+    return (True, "")
+
+
+def test_tool_scoring_ext_beats_path_only_deny() -> Tuple[bool, str]:
+    """Test 34: *.txt allow beats path-only deny (extension relevance wins)"""
+    cg = _load_command_guard()
+    userprofile = os.environ.get("USERPROFILE", os.path.expanduser("~")).replace("/", "\\")
+    rules = [
+        _make_tool_rule(cg, "r_deny", "deny", userprofile + "\\**"),
+        _make_tool_rule(cg, "r_allow", "allow", "*.txt"),
+    ]
+    target = userprofile + "\\notes.txt"
+    winner = cg.evaluate_tool(rules, "Write", target)
+    if winner is None or winner.action != cg.Action.ALLOW:
+        action_str = winner.action if winner else "None"
+        return (False, f"expected ALLOW (*.txt more relevant for .txt target), got {action_str}")
+    return (True, "")
+
+
+def test_tool_scoring_equal_specificity_deny_wins() -> Tuple[bool, str]:
+    """Test 35: identical pattern, deny wins over allow (tiebreak)"""
+    cg = _load_command_guard()
+    rules = [
+        _make_tool_rule(cg, "r_deny", "deny", "*.exe"),
+        _make_tool_rule(cg, "r_allow", "allow", "*.exe"),
+    ]
+    winner = cg.evaluate_tool(rules, "Write", "test.exe")
+    if winner is None or winner.action != cg.Action.DENY:
+        action_str = winner.action if winner else "None"
+        return (False, f"expected DENY on tie, got {action_str}")
+    return (True, "")
+
+
 def main() -> None:
     """Run all tests and print summary."""
     tests = [
@@ -546,6 +632,10 @@ def main() -> None:
         ("29. git add . hint mentions specific files", test_git_add_dot_hint),
         ("30. python -m hint mentions uv run", test_python_m_hint),
         ("31. killall hint mentions kill", test_killall_hint),
+        ("32. ext-deny beats path-allow (*.exe vs USERPROFILE/**)", test_tool_scoring_ext_beats_path_allow),
+        ("33. path+ext-allow beats ext-deny (USERPROFILE/**/*.exe vs *.exe)", test_tool_scoring_path_plus_ext_beats_ext_only),
+        ("34. ext-allow beats path-deny (*.txt vs USERPROFILE/**)", test_tool_scoring_ext_beats_path_only_deny),
+        ("35. identical specificity: deny wins over allow", test_tool_scoring_equal_specificity_deny_wins),
     ]
 
     passed = 0
