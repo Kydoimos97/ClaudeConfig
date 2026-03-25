@@ -9,6 +9,9 @@ matching with an index-accelerated evaluator.  Claude Code tool rules
 CLI flags (bypass hook mode):
   --verify   parse conf, report syntax/conflict errors, write commands.json
   --usage    aggregate rule hit counts from JSONL logs
+  --audit "command"           trace a command through every evaluation phase
+  --replay MM-DD-YYYY         replay a day's log and diff against current config
+  --mode <mode>               permission mode for --audit/--replay (default, dontAsk, bypassPermissions)
   --debug    print per-rule trace to stderr during hook evaluation
 """
 
@@ -55,6 +58,7 @@ class Action(str, Enum):
     ALLOW = "allow"
     DENY = "deny"
     ASK = "ask"
+    REQUIRE_ASK = "require_ask"  # [?] — always ask; deny in non-interactive modes
 
 
 @dataclass
@@ -178,13 +182,59 @@ _BASH_PREFIXES: dict[str, Action] = {
     "[+]": Action.ALLOW,
     "[-]": Action.DENY,
     "[~]": Action.ASK,
+    "[?]": Action.REQUIRE_ASK,
 }
 
 _TOOL_PREFIXES: dict[str, Action] = {
     "$[+]": Action.ALLOW,
     "$[-]": Action.DENY,
     "$[~]": Action.ASK,
+    "$[?]": Action.REQUIRE_ASK,
 }
+
+
+def _expand_braces(line: str, prefix: str) -> list[str]:
+    """Expand {a,b,c} alternations in the pattern portion of a rule line.
+
+    Returns one fully-formed rule line per expansion.  Multiple brace groups
+    produce the cartesian product.  If no braces are present, returns [line].
+    The inline hint (everything from the first ' #') is preserved unchanged on
+    every expansion.
+
+    Example:
+        '[-] git ** push ** {main,master} #msg'
+        → ['[-] git ** push ** main #msg',
+           '[-] git ** push ** master #msg']
+    """
+    rest = line[len(prefix) + 1:]
+    hint_part = ""
+    if " #" in rest:
+        pattern_part, hint_raw = rest.split(" #", 1)
+        hint_part = " #" + hint_raw
+    else:
+        pattern_part = rest
+
+    if "{" not in pattern_part:
+        return [line]
+
+    patterns = [pattern_part]
+    while True:
+        next_patterns: list[str] = []
+        expanded_any = False
+        for p in patterns:
+            m = re.search(r"\{([^{}]+)\}", p)
+            if not m:
+                next_patterns.append(p)
+                continue
+            expanded_any = True
+            pre, post = p[: m.start()], p[m.end() :]
+            for alt in m.group(1).split(","):
+                next_patterns.append(pre + alt.strip() + post)
+        patterns = next_patterns
+        if not expanded_any:
+            break
+
+    return [f"{prefix} {p.strip()}{hint_part}" for p in patterns]
 
 
 def _parse_bash_rule(stripped: str, prefix: str, action: Action, line_num: int) -> Rule:
@@ -249,20 +299,22 @@ def parse_conf(path: Path) -> tuple[list[Rule], list[ToolRule]]:
 
             for prefix, action in _TOOL_PREFIXES.items():
                 if stripped.startswith(prefix + " ") or stripped == prefix:
-                    try:
-                        tool_rules.append(_parse_tool_rule(stripped, prefix, action, line_num))
-                    except ValueError as exc:
-                        errors.append(str(exc))
+                    for expanded in _expand_braces(stripped, prefix):
+                        try:
+                            tool_rules.append(_parse_tool_rule(expanded, prefix, action, line_num))
+                        except ValueError as exc:
+                            errors.append(str(exc))
                     matched = True
                     break
 
             if not matched:
                 for prefix, action in _BASH_PREFIXES.items():
                     if stripped.startswith(prefix + " ") or stripped == prefix:
-                        try:
-                            bash_rules.append(_parse_bash_rule(stripped, prefix, action, line_num))
-                        except ValueError as exc:
-                            errors.append(str(exc))
+                        for expanded in _expand_braces(stripped, prefix):
+                            try:
+                                bash_rules.append(_parse_bash_rule(expanded, prefix, action, line_num))
+                            except ValueError as exc:
+                                errors.append(str(exc))
                         matched = True
                         break
 
@@ -425,6 +477,33 @@ def load_policy(
 # Matching engine — Bash rules
 # ---------------------------------------------------------------------------
 
+def _path_aware_match(pattern: str, arg: str) -> bool:
+    """Glob match with path-separator awareness.
+
+    Used when the pattern token itself contains '/' or '\\', enabling rules
+    like 'feat/*' (one segment) vs 'feat/**' (any depth).
+
+      *   matches any characters except / and \\
+      **  matches any characters including / and \\
+      ?   matches any single character except / and \\
+
+    Always case-insensitive.
+    """
+    parts = re.split(r"(\*\*|\*|\?)", pattern)
+    regex: list[str] = ["^"]
+    for part in parts:
+        if part == "**":
+            regex.append(".*")
+        elif part == "*":
+            regex.append("[^/\\\\]*")
+        elif part == "?":
+            regex.append("[^/\\\\]")
+        else:
+            regex.append(re.escape(part))
+    regex.append("$")
+    return bool(re.match("".join(regex), arg, re.IGNORECASE))
+
+
 def _match_single(token: Token, arg: str) -> bool:
     a = arg.lower()
     if token.type == TokenType.LITERAL:
@@ -440,6 +519,12 @@ def _match_single(token: Token, arg: str) -> bool:
         # still works — both sides have =).
         if "=" in a and not a.startswith("-") and "=" not in token.value:
             return False
+        # Path-aware matching when the pattern itself contains a separator.
+        # feat/*  → one segment (does not cross /)
+        # feat/** → any depth  (crosses /)
+        # Non-path patterns like *.exe keep the original fnmatch behaviour.
+        if "/" in token.value or "\\" in token.value:
+            return _path_aware_match(token.value, a)
         return fnmatch.fnmatchcase(a, token.value)
     return False  # wildcard_multi is handled one level up
 
@@ -464,7 +549,7 @@ def _match_tokens(ptokens: list[Token], itokens: list[str], pi: int = 0, ii: int
     return pi == len(ptokens) and ii == len(itokens)
 
 
-_ACTION_PRIORITY: dict[Action, int] = {Action.DENY: 2, Action.ASK: 1, Action.ALLOW: 0}
+_ACTION_PRIORITY: dict[Action, int] = {Action.DENY: 3, Action.REQUIRE_ASK: 2, Action.ASK: 1, Action.ALLOW: 0}
 
 
 def _beats(challenger: Rule, current: Rule) -> bool:
@@ -732,7 +817,7 @@ def _raw_pass(
     /etc/passwd') and any conf-defined compound deny rules.
     """
     winner, _, _, _ = evaluate_bash(bash_rules, index, tokens, debug=debug)
-    if winner is not None and winner.action in (Action.DENY, Action.ASK):
+    if winner is not None and winner.action in (Action.DENY, Action.ASK, Action.REQUIRE_ASK):
         return winner
     return None
 
@@ -848,26 +933,31 @@ _DONT_ASK_DENY_REASON: str = (
 def _effective_decision(
     decision: str, event: str, permission_mode: str
 ) -> tuple[str, Optional[str]]:
-    """Escalate 'ask' to 'deny' when the session cannot surface a prompt.
+    """Resolve the final decision given session interactivity constraints.
 
     Returns (final_decision, reason_override).  reason_override is non-None
-    only when the escalation adds its own explanation; callers should use it
+    only when an escalation adds its own explanation; callers should use it
     in place of the rule's hint when present.
 
-    Two conditions require silent escalation to deny:
-    - PermissionRequest event: the hook is acting as a permission fallback
-      and 'ask' is not a valid response for that event.  The rule's own hint
-      is kept as the reason.
-    - Non-interactive permission mode (dontAsk, bypassPermissions): Claude
-      will not pause to confirm, so leaving 'ask' in place silently bypasses
-      the guard intent.  A dedicated guidance message is returned so Claude
-      understands why it was blocked and how to proceed.
+    Rule semantics:
+      [~] ask        — heads-up confirmation in interactive mode; auto-allowed
+                       in non-interactive mode (dontAsk/bypassPermissions).
+      [?] require_ask — always requires a human; denied in non-interactive mode.
+
+    PermissionRequest event handling:
+      Both ask and require_ask collapse to deny — the event is a fallback
+      mechanism that cannot surface interactive prompts, so neither can be
+      honoured.  The rule's own hint is kept as the reason in that case.
     """
     if decision == "ask":
         if event == "PermissionRequest":
             return "deny", None
         if permission_mode in _NON_INTERACTIVE_MODES:
+            return "allow", None
+    if decision == "require_ask":
+        if event == "PermissionRequest" or permission_mode in _NON_INTERACTIVE_MODES:
             return "deny", _DONT_ASK_DENY_REASON
+        return "ask", None
     return decision, None
 
 
@@ -957,20 +1047,21 @@ def check_settings_conflicts(
     parsed_allows = [_parse_settings_entry(e) for e in allow_entries]
 
     for rule in bash_rules:
-        if rule.action != Action.ASK:
+        if rule.action not in (Action.ASK, Action.REQUIRE_ASK):
             continue
         for sname, spattern in parsed_allows:
             if sname != "bash" or spattern is None:
                 continue
             if _patterns_could_overlap(rule.tokens, _bash_tokens(spattern)):
+                prefix = "[~]" if rule.action == Action.ASK else "[?]"
                 warnings.append(
-                    f"  WARN  {rule.id} ([~] {rule.normalized!r}) may be silenced by"
+                    f"  WARN  {rule.id} ({prefix} {rule.normalized!r}) may be silenced by"
                     f" settings allow 'Bash({spattern})'"
                 )
                 break
 
     for rule in tool_rules:
-        if rule.action != Action.ASK:
+        if rule.action not in (Action.ASK, Action.REQUIRE_ASK):
             continue
         for sname, spattern in parsed_allows:
             if sname != rule.tool_name:
@@ -1140,6 +1231,342 @@ def cmd_usage() -> None:
             f"{d.get('defer', 0):>6}  "
             f"{row:>6}"
         )
+
+
+# ---------------------------------------------------------------------------
+# CLI: --audit
+# ---------------------------------------------------------------------------
+
+_ANSI_GREEN = "\033[32m"
+_ANSI_RED = "\033[31m"
+_ANSI_YELLOW = "\033[33m"
+_ANSI_CYAN = "\033[36m"
+_ANSI_DIM = "\033[2m"
+_ANSI_BOLD = "\033[1m"
+_ANSI_RESET = "\033[0m"
+
+_DECISION_COLOR = {
+    "allow": _ANSI_GREEN,
+    "deny": _ANSI_RED,
+    "ask": _ANSI_YELLOW,
+    "require_ask": _ANSI_YELLOW,
+}
+
+_NO_COLOR: bool = False
+
+
+def _colored(text: str, color: str) -> str:
+    if _NO_COLOR or not sys.stdout.isatty():
+        return text
+    return f"{color}{text}{_ANSI_RESET}"
+
+
+def cmd_audit(command: str, permission_mode: str = "default") -> None:
+    """Trace a command through the full evaluation pipeline, showing every rule."""
+    bash_rules, index, tool_rules = load_policy(CONF_PATH, JSON_PATH)
+
+    print(f"{_colored('Auditing:', _ANSI_BOLD)}  {command}")
+    print(f"Mode:      {permission_mode}")
+
+    normalized = normalize(command)
+    raw_tokens = normalized.lower().split()
+    print(f"Tokens:    {raw_tokens}\n")
+
+    # --- Phase 1: pipe-to-shell ---
+    print(_colored("── Phase 1: pipe-to-shell check ──", _ANSI_DIM))
+    pipe_shell = _check_pipe_to_shell(raw_tokens)
+    if pipe_shell:
+        print(_colored(f"  BLOCKED  pipe to {pipe_shell} detected → deny", _ANSI_RED))
+        effective, _ = _effective_decision("deny", "PreToolUse", permission_mode)
+        print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}")
+        return
+    print(_colored("  pass (no pipe-to-shell)", _ANSI_DIM))
+
+    # --- Phase 2: raw pass ---
+    print(_colored("\n── Phase 2: raw pass (full token stream vs deny/ask rules) ──", _ANSI_DIM))
+    raw_winner = _raw_pass(raw_tokens, bash_rules, index, debug=False)
+    if raw_winner is not None:
+        c = _DECISION_COLOR.get(raw_winner.action.value, "")
+        print(f"  {_colored('HIT', c)}  {raw_winner.id} line={raw_winner.line}"
+              f"  {_colored(raw_winner.action.value, c)}"
+              f"  {raw_winner.normalized}")
+        if raw_winner.hint:
+            print(f"       hint: {raw_winner.hint}")
+        effective, reason_override = _effective_decision(raw_winner.action.value, "PreToolUse", permission_mode)
+        if reason_override:
+            print(f"       escalated: {effective}")
+        print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}")
+        return
+    print(_colored("  pass (no deny/ask matched on raw tokens)", _ANSI_DIM))
+
+    # --- Phase 3: tree-sitter extraction ---
+    print(_colored("\n── Phase 3: tree-sitter command extraction ──", _ANSI_DIM))
+    try:
+        sub_commands = extract_commands(normalized)
+    except ImportError as exc:
+        print(_colored(f"  FAIL  tree-sitter not available: {exc}", _ANSI_RED))
+        print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored('deny', _ANSI_RED)} (tree-sitter missing)")
+        return
+
+    if not sub_commands:
+        print(_colored("  no commands in parse tree", _ANSI_YELLOW))
+        effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
+        print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}"
+              f" (empty parse → fallback ask)")
+        return
+
+    for i, sc in enumerate(sub_commands):
+        print(f"  sub[{i}]: {sc}")
+
+    # --- Phase 4: per-command evaluation ---
+    print(_colored("\n── Phase 4: per-command rule evaluation ──", _ANSI_DIM))
+    governing: Optional[Rule] = None
+
+    for cmd_text in sub_commands:
+        cleaned = strip_env_assignments(cmd_text)
+        tokens = cleaned.lower().split()
+        if not tokens:
+            continue
+        if all(t.strip("\\") == "" for t in tokens):
+            continue
+
+        print(f"\n  {_colored('→ ' + cmd_text, _ANSI_BOLD)}")
+        print(f"    tokens: {tokens}")
+
+        first = tokens[0].lower()
+        positions: set[int] = set(index.get(first, []))
+        positions.update(index.get("*", []))
+
+        winner: Optional[Rule] = None
+        for pos in sorted(positions):
+            rule = bash_rules[pos]
+            matched = _match_tokens(rule.tokens, tokens)
+            if matched:
+                is_best = winner is None or _beats(rule, winner)
+                if is_best:
+                    winner = rule
+                c = _DECISION_COLOR.get(rule.action.value, "")
+                best_tag = _colored(" ← best", _ANSI_CYAN) if is_best else ""
+                print(f"    {_colored('✓', c)} {rule.id:<14} {_colored(rule.action.value, c):<18}"
+                      f" score={rule.specificity.content_score:<4} {rule.normalized}{best_tag}")
+            else:
+                print(f"    {_colored('·', _ANSI_DIM)} {rule.id:<14} {_colored(rule.action.value, _ANSI_DIM):<18}"
+                      f" score={rule.specificity.content_score:<4} {rule.normalized}")
+
+        if winner is None:
+            print(f"    {_colored('NO MATCH', _ANSI_YELLOW)} → fallback ask")
+            effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
+            print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}"
+                  f" (no rule matched sub-command: {tokens[0]})")
+            return
+
+        if winner.action in (Action.DENY, Action.ASK, Action.REQUIRE_ASK):
+            governing = winner
+            break
+
+        if governing is None or _beats(winner, governing):
+            governing = winner
+
+    if governing is None:
+        effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
+        print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}"
+              f" (no governing rule)")
+        return
+
+    effective, reason_override = _effective_decision(governing.action.value, "PreToolUse", permission_mode)
+    ec = _DECISION_COLOR.get(effective, "")
+    print(f"\n{_colored('Governing:', _ANSI_BOLD)}  {governing.id} line={governing.line}"
+          f"  {governing.action.value}  {governing.normalized}")
+    if governing.hint:
+        print(f"            hint: {governing.hint}")
+    if reason_override:
+        print(f"            escalated in mode={permission_mode}")
+    print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, ec)}")
+
+
+# ---------------------------------------------------------------------------
+# CLI: --replay
+# ---------------------------------------------------------------------------
+
+def cmd_replay(date_str: str, permission_mode: str = "default") -> None:
+    """Replay logged commands from a date and diff outcomes against current config."""
+    if not LOG_DIR.exists():
+        print("No log directory found.")
+        return
+
+    # Normalize date input: accept 03-23-2026, 2026-03-23, etc.
+    for fmt in ("%m-%d-%Y", "%Y-%m-%d", "%m/%d/%Y", "%Y/%m/%d"):
+        try:
+            dt = datetime.strptime(date_str, fmt)
+            break
+        except ValueError:
+            continue
+    else:
+        print(f"Could not parse date: {date_str!r}")
+        print("Accepted formats: MM-DD-YYYY, YYYY-MM-DD, MM/DD/YYYY, YYYY/MM/DD")
+        sys.exit(1)
+
+    log_date = dt.strftime("%Y-%m-%d")
+    log_file = LOG_DIR / f"{log_date}_commands.jsonl"
+    if not log_file.exists():
+        print(f"No log file for {log_date}: {log_file}")
+        return
+
+    bash_rules, index, tool_rules = load_policy(CONF_PATH, JSON_PATH)
+
+    entries: list[dict] = []
+    with open(log_file, "r", encoding="utf-8") as f:
+        for raw_line in f:
+            raw_line = raw_line.strip()
+            if not raw_line:
+                continue
+            try:
+                entries.append(json.loads(raw_line))
+            except json.JSONDecodeError:
+                continue
+
+    if not entries:
+        print(f"No entries in {log_file}")
+        return
+
+    total = 0
+    changed = 0
+    unchanged = 0
+    skipped = 0
+
+    print(f"{_colored('Replaying', _ANSI_BOLD)} {len(entries)} entries from {log_date}")
+    print(f"Policy:    {CONF_PATH}")
+    print(f"Mode:      {permission_mode}\n")
+    print(f"{'#':<5} {'old':<12} {'new':<12} {'delta':<8} command")
+    sep = "\u2500" * 80
+    print(sep)
+
+    for i, entry in enumerate(entries):
+        result = entry.get("result", {})
+        old_decision = result.get("decision", "")
+        if not old_decision:
+            skipped += 1
+            continue
+
+        norm = entry.get("normalized", {})
+        command = norm.get("command", "")
+        tokens = norm.get("tokens", [])
+
+        if not command and not tokens:
+            skipped += 1
+            continue
+
+        total += 1
+
+        new_decision = _replay_evaluate(command, tokens, bash_rules, index, tool_rules, permission_mode)
+
+        # Normalize old decision for comparison (require_ask → ask in interactive)
+        old_effective = old_decision
+        if old_effective == "require_ask":
+            old_effective = "ask"
+
+        is_changed = old_effective != new_decision
+        if is_changed:
+            changed += 1
+        else:
+            unchanged += 1
+
+        if is_changed:
+            old_c = _DECISION_COLOR.get(old_effective, "")
+            new_c = _DECISION_COLOR.get(new_decision, "")
+            delta = _colored("CHANGED", _ANSI_RED)
+            cmd_display = command[:60] if command else " ".join(tokens)[:60]
+            print(f"{total:<5} {_colored(old_effective, old_c):<22} {_colored(new_decision, new_c):<22}"
+                  f" {delta:<18} {cmd_display}")
+
+    print(sep)
+    print(f"\nTotal: {total}  Unchanged: {unchanged}  "
+          f"{_colored(f'Changed: {changed}', _ANSI_RED if changed else _ANSI_GREEN)}  "
+          f"Skipped: {skipped}")
+
+    if changed == 0:
+        print(_colored("\n✓ No outcome changes — current config matches logged behavior.", _ANSI_GREEN))
+    else:
+        print(_colored(f"\n⚠ {changed} command(s) would produce different outcomes with current config.", _ANSI_YELLOW))
+        print("  Run --audit \"<command>\" on specific commands to investigate.")
+
+
+def _replay_evaluate(
+    command: str,
+    tokens: list[str],
+    bash_rules: list[Rule],
+    index: dict[str, list[int]],
+    tool_rules: list[ToolRule],
+    permission_mode: str,
+) -> str:
+    """Re-evaluate a single logged command against current rules. Returns final decision."""
+    if not tokens and command:
+        tokens = command.lower().split()
+    if not tokens:
+        return "defer"
+
+    # Detect tool entries: check if first token is a known tool from $-rules
+    known_tools = {r.tool_name for r in tool_rules}  # already lowercased
+    first_lower = tokens[0].lower()
+
+    if first_lower in known_tools and first_lower != "bash":
+        tool_name = tokens[0]
+        target = " ".join(tokens[1:]) if len(tokens) > 1 else ""
+        winner = evaluate_tool(tool_rules, tool_name, target, debug=False)
+        if winner is None:
+            return "defer"
+        effective, _ = _effective_decision(winner.action.value, "PreToolUse", permission_mode)
+        return effective
+
+    # Bash command evaluation
+    pipe_shell = _check_pipe_to_shell(tokens)
+    if pipe_shell:
+        return "deny"
+
+    raw_winner = _raw_pass(tokens, bash_rules, index, debug=False)
+    if raw_winner is not None:
+        effective, _ = _effective_decision(raw_winner.action.value, "PreToolUse", permission_mode)
+        return effective
+
+    cmd_str = command if command else " ".join(tokens)
+    try:
+        sub_commands = extract_commands(cmd_str)
+    except ImportError:
+        return "deny"
+
+    if not sub_commands:
+        effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
+        return effective
+
+    governing: Optional[Rule] = None
+
+    for cmd_text in sub_commands:
+        cleaned = strip_env_assignments(cmd_text)
+        sub_tokens = cleaned.lower().split()
+        if not sub_tokens:
+            continue
+        if all(t.strip("\\") == "" for t in sub_tokens):
+            continue
+
+        winner, _, _, _ = evaluate_bash(bash_rules, index, sub_tokens, debug=False)
+
+        if winner is None:
+            effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
+            return effective
+
+        if winner.action in (Action.DENY, Action.ASK, Action.REQUIRE_ASK):
+            governing = winner
+            break
+
+        if governing is None or _beats(winner, governing):
+            governing = winner
+
+    if governing is None:
+        effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
+        return effective
+
+    effective, _ = _effective_decision(governing.action.value, "PreToolUse", permission_mode)
+    return effective
 
 
 # ---------------------------------------------------------------------------
@@ -1362,7 +1789,7 @@ def _handle_bash(
             )
             return
 
-        if winner.action in (Action.DENY, Action.ASK):
+        if winner.action in (Action.DENY, Action.ASK, Action.REQUIRE_ASK):
             governing = winner
             governing_tokens = tokens
             break  # deny/ask on any sub-command governs immediately
@@ -1425,7 +1852,19 @@ def main() -> None:
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--verify", action="store_true")
     parser.add_argument("--usage", action="store_true")
+    parser.add_argument("--audit", type=str, default=None,
+                        help='Trace a command: --audit "git push origin main"')
+    parser.add_argument("--replay", type=str, default=None,
+                        help="Replay a day's log: --replay 03-23-2026")
+    parser.add_argument("--mode", type=str, default="default",
+                        help="Permission mode for --audit/--replay (default, dontAsk, bypassPermissions)")
+    parser.add_argument("--no-color", action="store_true",
+                        help="Disable ANSI color codes in output (auto-set when stdout is not a tty)")
     args, _ = parser.parse_known_args()
+
+    if args.no_color:
+        global _NO_COLOR
+        _NO_COLOR = True
 
     if args.verify:
         cmd_verify()
@@ -1433,6 +1872,14 @@ def main() -> None:
 
     if args.usage:
         cmd_usage()
+        return
+
+    if args.audit is not None:
+        cmd_audit(args.audit, permission_mode=args.mode)
+        return
+
+    if args.replay is not None:
+        cmd_replay(args.replay, permission_mode=args.mode)
         return
 
     raw_input = sys.stdin.read()
