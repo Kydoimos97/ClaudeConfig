@@ -15,8 +15,11 @@ Invoke kiro-cli for research, exploration, and triage. Kiro runs inside WSL
 ## Invocation
 
 ```bash
-wsl -d Ubuntu bash -lc "kiro-cli chat --no-interactive --trust-all-tools \"<fully scoped prompt>\""
+kiro-cli chat --no-interactive --trust-all-tools "<fully scoped prompt>"
 ```
+
+`kiro-cli` is available as a bash shim at `C:\Bin\kiro-cli` — call it directly,
+no `wsl` prefix required.
 
 `--trust-all-tools` is required — without it Kiro will prompt for approval and
 hang. The prompt must be fully self-contained: role, exact goal, output format,
@@ -27,6 +30,28 @@ indefinitely if the model loops or stalls. Recommended: `timeout: 120000`
 (2 minutes) for fetch/triage, `timeout: 180000` (3 minutes) for discovery or
 research. If the command times out, check whether output was partially written
 before retrying.
+
+## Failure handling
+
+If `kiro-cli` exits non-zero or produces no output, report the failure
+explicitly — include the exit code and any stderr. Do not retry silently.
+
+If the failure indicates a permission or tool-access denial, read the Kiro
+agent permissions file to understand what is currently allowed and suggest
+the specific change needed:
+
+```
+\\wsl$\Ubuntu\home\willem\.kiro\agents\default.json
+```
+
+Permissions are defined there as `allowedCommands` / `deniedCommands` arrays.
+Propose the exact JSON edit required to unblock the task, then stop and let
+the user apply it.
+
+In `dontAsk` / `bypassPermissions` mode: instead of blocking on the permission
+gap, run the task yourself using the available tools (WebSearch, WebFetch, Read,
+Grep, Glob etc.) and note at the end of your response what Kiro permission was
+missing and what edit would fix it for future runs.
 
 ## Capabilities and limits
 
