@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# usePwsh7 — bash shim to run PowerShell commands with all custom modules loaded
+# Usage: usePwsh7 nav axis
+pwsh -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "C:\Bin\cli\usePwsh7.ps1" "$@"
