@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# c-guard — CLI shim for command-guard.py
+# Drop this in a directory on your PATH (e.g. ~/.local/bin or ~/bin)
+#
+# Usage:
+#   c-guard audit "git push origin main"
+#   c-guard audit "wsl -d Ubuntu bash -lc 'gh pr view 123'" --mode dontAsk
+#   c-guard replay 03-23-2026
+#   c-guard replay 03-23-2026 --mode dontAsk
+#   c-guard verify
+#   c-guard usage
+
+GUARD_PY="${CLAUDE_HOOKS_DIR:-$HOME/.claude/hooks}/command-guard.py"
+
+if [[ ! -f "$GUARD_PY" ]]; then
+    echo "error: command-guard.py not found at $GUARD_PY" >&2
+    echo "       set CLAUDE_HOOKS_DIR to your hooks directory" >&2
+    exit 1
+fi
+
+cmd="${1:-help}"
+shift 2>/dev/null
+
+# Automatically disable color when stdout is not a terminal
+no_color_flag=""
+[[ ! -t 1 ]] && no_color_flag="--no-color"
+
+case "$cmd" in
+    audit)
+        command="${1:?usage: c-guard audit \"command\" [--mode MODE]}"
+        shift
+        python3 "$GUARD_PY" --audit "$command" $no_color_flag "$@"
+        ;;
+    replay)
+        date="${1:?usage: c-guard replay MM-DD-YYYY [--mode MODE]}"
+        shift
+        python3 "$GUARD_PY" --replay "$date" $no_color_flag "$@"
+        ;;
+    verify)
+        python3 "$GUARD_PY" --verify "$@"
+        ;;
+    usage)
+        python3 "$GUARD_PY" --usage "$@"
+        ;;
+    help|--help|-h)
+        cat <<'EOF'
+c-guard — command-guard.py CLI
+
+Commands:
+  audit "command"              Trace a command through all evaluation phases
+  replay MM-DD-YYYY            Replay a day's log, diff against current config
+  verify                       Parse conf, report errors, write commands.json
+  usage                        Aggregate rule hit counts from logs
+
+Options (audit):
+  --mode MODE                  Permission mode: default, dontAsk, bypassPermissions
+  --compact                    One line per sub-command, governing rule only
+  --no-color                   Disable ANSI color (auto-set when stdout is not a tty)
+
+Options (replay):
+  --mode MODE                  Permission mode: default, dontAsk, bypassPermissions
+  --no-color                   Disable ANSI color (auto-set when stdout is not a tty)
+
+Examples:
+  c-guard audit "git push --force origin main"
+  c-guard audit "curl http://example.com -d payload" --mode dontAsk
+  c-guard audit "git log | head -20 && aws s3 cp s3://b/f ." --compact
+  c-guard replay 03-23-2026
+  c-guard replay 2026-03-23 --mode bypassPermissions
+  c-guard verify
+
+Environment:
+  CLAUDE_HOOKS_DIR             Override hooks directory (default: ~/.claude/hooks)
+EOF
+        ;;
+    *)
+        echo "Unknown command: $cmd" >&2
+        echo "Run: c-guard help" >&2
+        exit 1
+        ;;
+esac
