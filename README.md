@@ -48,10 +48,15 @@ pip install plyer            # Linux/macOS
 ```
 
 **Logs written to:** `~/.claude/custom_logs/`
-- `YYYY-MM-DD_commands.jsonl` — command-guard decisions
-- `YYYY-MM-DD_tokens.jsonl` — agent delegation usage
-- `YYYY-MM-DD_notif.jsonl` — notifications dispatched
-- `hook_errors.jsonl` — hook errors (not rotated)
+
+| File | Written by | Contents |
+|------|-----------|---------|
+| `YYYY-MM-DD_commands.jsonl` | command-guard | Every Bash and tool decision: timestamp, command, tokens, decision (allow/deny/ask/defer), matched rule ID and line, hint, duration |
+| `YYYY-MM-DD_tokens.jsonl` | track-agent-tokens | Every Agent subagent call: agent type, model, description, session, token counts (input/output/cache read/cache creation), tool use count, duration |
+| `YYYY-MM-DD_notif.jsonl` | claude-notify | Every desktop notification: preset, title, message, repo, platform |
+| `hook_errors.jsonl` | all hooks | Hook-level errors (not rotated; append-only) |
+
+These logs are the primary tool for evaluating workflow quality after a session. `commands.jsonl` shows exactly what Claude ran and what the guard decided; `tokens.jsonl` shows the delegation cost of each subagent call. Together they let you answer: what did Claude actually do, what got blocked or questioned, and how expensive was the delegation strategy.
 
 ## Hooks
 
@@ -95,15 +100,65 @@ Tool rules match against `ToolName` (e.g. `Read`, `Edit`, `Write`, `WebFetch`, `
 **CLI mode** (`c-guard` shim calls `command-guard.py` directly):
 
 ```
-c-guard audit "git push --force origin main"
-c-guard audit "rm -rf /tmp/foo" --mode bypassPermissions
-command-guard.py --verify         # parse conf, report errors, write commands.json
-command-guard.py --usage          # aggregate rule hit counts from JSONL logs
-command-guard.py --replay 03-25-2026  # replay a day's log against current config
-command-guard.py --debug          # print per-rule trace to stderr
+c-guard audit "git push origin main"
+c-guard audit "wsl -d Ubuntu -- bash -c whoami" --mode dontAsk
+c-guard replay 03-24-2026
+c-guard replay 03-24-2026 --mode bypassPermissions
+c-guard verify
+c-guard usage
 ```
 
-Logs every decision to `commands.jsonl`.
+**`audit`** — traces a single command through every evaluation phase and prints the final decision:
+
+```
+Auditing:  git push origin main
+Mode:      default
+Tokens:    ['git', 'push', 'origin', 'main']
+
+── Phase 1: pipe-to-shell check ──
+  pass (no pipe-to-shell)
+
+── Phase 2: raw pass (full token stream vs deny/ask rules) ──
+  HIT  rule_271 line=271  deny  git ** push ** origin main
+       hint: Protected branch: open a PR instead
+
+Final:  deny
+```
+
+Phases: (1) pipe-to-shell detection, (2) raw token pass against deny/ask rules, (3) tree-sitter sub-command extraction, (4) per-sub-command rule evaluation. The `--mode` flag simulates `dontAsk` or `bypassPermissions` to show how `[~]` and `[?]` rules escalate.
+
+![audit full output](resources/audit-full.png)
+
+Add `--compact` to get one line per sub-command showing only the governing rule:
+
+![audit compact output](resources/audit-compact.png)
+
+**`replay`** — re-evaluates every entry from a past `commands.jsonl` against the current policy and reports what changed:
+
+```
+Replaying 3244 entries from 2026-03-24
+Policy:    ~/.claude/hooks/resources/commands.conf
+Mode:      default
+
+#     old          new          delta    command
+────────────────────────────────────────────────────────
+38    ask          deny         CHANGED  wsl -d Ubuntu -- bash -c "which kiro..."
+83    ask          allow        CHANGED  c-guard --help 2>&1 || c-guard help 2>&1
+90    allow        deny         CHANGED  pwsh -NoLogo -NonInteractive -Command ...
+2515  deny         ask          CHANGED  Edit ~/.claude/hooks/resources/commands.conf
+────────────────────────────────────────────────────────
+Total: 3244  Unchanged: 3225  Changed: 19  Skipped: 0
+```
+
+Use this whenever you edit `commands.conf` — it shows exactly which past commands would now be decided differently, so you can catch over-permissive or over-restrictive changes before they affect a live session.
+
+![replay output](resources/c-guard-replay.png)
+
+**`verify`** — parses `commands.conf`, reports syntax errors and conflicts, and writes `commands.json`.
+
+**`usage`** — aggregates rule hit counts from all `commands.jsonl` logs to show which rules are active and which are dead.
+
+Logs every live hook decision to `commands.jsonl`.
 
 ### hook-dispatcher (all events)
 
@@ -134,6 +189,8 @@ claude-notify.py <preset> [detail] [error_snippet]
 For `approval` events the message is enriched from the hook payload: Edit/Write shows the filename; Bash shows the first 80 characters of the command.
 
 On Windows uses `windows_toasts` with AUMID `ClaudeCode` registered under `HKCU\Software\Classes\AppUserModelId\ClaudeCode`. On Linux/macOS uses `plyer`. Logs each notification to `notif.jsonl`.
+
+![desktop notifications](resources/notifications.png)
 
 ### track-agent-tokens (PostToolUse — Agent tool only)
 
@@ -181,7 +238,14 @@ Create `resources/{agent_name}_hooks.json` modelled on `beebop_hooks.json`. The 
 uv run python hooks/guard-gap-analysis.py [--days N] [--top N] [--min N]
 ```
 
-Reports: decision breakdown, frequently deferred commands (no rule matched), frequently denied commands, frequently auto-approved asks (candidates for promotion to `[+]`), and per-rule hit frequency.
+Reports:
+- **Decision breakdown** — overall allow/deny/ask/defer split across the time window
+- **Coverage gaps** — commands that hit `defer` (no rule matched) repeatedly; these are candidates for new rules
+- **Deny frequency** — most-blocked commands; may indicate rules that are too aggressive
+- **Ask candidates** — commands routinely approved via `[~]` asks; candidates for promotion to `[+]`
+- **Rule hit frequency** — which rules are firing most and which are never hit (dead rules)
+
+Run this after a few days of normal use to drive the first round of `commands.conf` tuning. Pair with `c-guard replay` to verify the tuned config against the same history before committing it.
 
 ## Troubleshooting
 

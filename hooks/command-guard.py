@@ -771,10 +771,19 @@ def extract_commands(command: str) -> list[str]:
 def strip_env_assignments(text: str) -> str:
     """Strip leading KEY=value environment variable assignments."""
     while True:
-        match = re.match(r"^[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+", text)
-        if not match:
-            break
-        text = text[match.end():]
+        m = re.match(r"^[A-Za-z_][A-Za-z0-9_]*='[^']*'\s+", text)
+        if m:
+            text = text[m.end():]
+            continue
+        m = re.match(r'^[A-Za-z_][A-Za-z0-9_]*="[^"]*"\s+', text)
+        if m:
+            text = text[m.end():]
+            continue
+        m = re.match(r"^[A-Za-z_][A-Za-z0-9_]*=[^\s'\"]*\s+", text)
+        if m:
+            text = text[m.end():]
+            continue
+        break
     return text.strip()
 
 
@@ -1253,6 +1262,14 @@ _DECISION_COLOR = {
 }
 
 _NO_COLOR: bool = False
+_UTF8_STDOUT: bool = "utf" in (getattr(sys.stdout, "encoding", None) or "").lower()
+_SEP_CHAR: str = "\u2500" if _UTF8_STDOUT else "-"
+_RULE_SEP: str = "\u2500\u2500" if _UTF8_STDOUT else "--"
+_CHK: str = "\u2713" if _UTF8_STDOUT else "+"   # ✓
+_DOT: str = "\u00b7" if _UTF8_STDOUT else "."   # ·
+_ARR: str = "\u2190" if _UTF8_STDOUT else "<-"  # ←
+_RARR: str = "\u2192" if _UTF8_STDOUT else "->" # →
+_WARN: str = "\u26a0" if _UTF8_STDOUT else "!"  # ⚠
 
 
 def _colored(text: str, color: str) -> str:
@@ -1261,7 +1278,14 @@ def _colored(text: str, color: str) -> str:
     return f"{color}{text}{_ANSI_RESET}"
 
 
-def cmd_audit(command: str, permission_mode: str = "default") -> None:
+def _cpad(text: str, color: str, width: int) -> str:
+    """Left-justify a colored string to `width` visible characters."""
+    colored = _colored(text, color)
+    ansi_overhead = len(colored) - len(text)
+    return colored.ljust(width + ansi_overhead)
+
+
+def cmd_audit(command: str, permission_mode: str = "default", compact: bool = False) -> None:
     """Trace a command through the full evaluation pipeline, showing every rule."""
     bash_rules, index, tool_rules = load_policy(CONF_PATH, JSON_PATH)
 
@@ -1270,56 +1294,76 @@ def cmd_audit(command: str, permission_mode: str = "default") -> None:
 
     normalized = normalize(command)
     raw_tokens = normalized.lower().split()
-    print(f"Tokens:    {raw_tokens}\n")
+    if not compact:
+        print(f"Tokens:    {raw_tokens}\n")
 
     # --- Phase 1: pipe-to-shell ---
-    print(_colored("── Phase 1: pipe-to-shell check ──", _ANSI_DIM))
+    if not compact:
+        print(_colored(f"{_RULE_SEP} Phase 1: pipe-to-shell check {_RULE_SEP}", _ANSI_DIM))
     pipe_shell = _check_pipe_to_shell(raw_tokens)
     if pipe_shell:
-        print(_colored(f"  BLOCKED  pipe to {pipe_shell} detected → deny", _ANSI_RED))
+        if not compact:
+            print(_colored(f"  BLOCKED  pipe to {pipe_shell} detected {_RARR} deny", _ANSI_RED))
         effective, _ = _effective_decision("deny", "PreToolUse", permission_mode)
+        if compact:
+            print(f"\n  {_colored('pipe-to-shell', _ANSI_RED)}  {pipe_shell}")
         print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}")
         return
-    print(_colored("  pass (no pipe-to-shell)", _ANSI_DIM))
+    if not compact:
+        print(_colored("  pass (no pipe-to-shell)", _ANSI_DIM))
 
     # --- Phase 2: raw pass ---
-    print(_colored("\n── Phase 2: raw pass (full token stream vs deny/ask rules) ──", _ANSI_DIM))
+    if not compact:
+        print(_colored(f"\n{_RULE_SEP} Phase 2: raw pass (full token stream vs deny/ask rules) {_RULE_SEP}", _ANSI_DIM))
     raw_winner = _raw_pass(raw_tokens, bash_rules, index, debug=False)
     if raw_winner is not None:
         c = _DECISION_COLOR.get(raw_winner.action.value, "")
-        print(f"  {_colored('HIT', c)}  {raw_winner.id} line={raw_winner.line}"
-              f"  {_colored(raw_winner.action.value, c)}"
-              f"  {raw_winner.normalized}")
-        if raw_winner.hint:
-            print(f"       hint: {raw_winner.hint}")
+        if compact:
+            hint_str = f"  # {raw_winner.hint}" if raw_winner.hint else ""
+            print(f"\n  {_colored(raw_winner.action.value, c):<18} {raw_winner.id} line={raw_winner.line}"
+                  f"  {raw_winner.normalized}{hint_str}")
+        else:
+            print(f"  {_colored('HIT', c)}  {raw_winner.id} line={raw_winner.line}"
+                  f"  {_colored(raw_winner.action.value, c)}"
+                  f"  {raw_winner.normalized}")
+            if raw_winner.hint:
+                print(f"       hint: {raw_winner.hint}")
         effective, reason_override = _effective_decision(raw_winner.action.value, "PreToolUse", permission_mode)
-        if reason_override:
+        if not compact and reason_override:
             print(f"       escalated: {effective}")
         print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}")
         return
-    print(_colored("  pass (no deny/ask matched on raw tokens)", _ANSI_DIM))
+    if not compact:
+        print(_colored("  pass (no deny/ask matched on raw tokens)", _ANSI_DIM))
 
     # --- Phase 3: tree-sitter extraction ---
-    print(_colored("\n── Phase 3: tree-sitter command extraction ──", _ANSI_DIM))
+    if not compact:
+        print(_colored(f"\n{_RULE_SEP} Phase 3: tree-sitter command extraction {_RULE_SEP}", _ANSI_DIM))
     try:
         sub_commands = extract_commands(normalized)
     except ImportError as exc:
-        print(_colored(f"  FAIL  tree-sitter not available: {exc}", _ANSI_RED))
+        if not compact:
+            print(_colored(f"  FAIL  tree-sitter not available: {exc}", _ANSI_RED))
         print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored('deny', _ANSI_RED)} (tree-sitter missing)")
         return
 
     if not sub_commands:
-        print(_colored("  no commands in parse tree", _ANSI_YELLOW))
+        if not compact:
+            print(_colored("  no commands in parse tree", _ANSI_YELLOW))
         effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
         print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}"
-              f" (empty parse → fallback ask)")
+              f" (empty parse {_RARR} fallback ask)")
         return
 
-    for i, sc in enumerate(sub_commands):
-        print(f"  sub[{i}]: {sc}")
+    if not compact:
+        for i, sc in enumerate(sub_commands):
+            print(f"  sub[{i}]: {sc}")
 
     # --- Phase 4: per-command evaluation ---
-    print(_colored("\n── Phase 4: per-command rule evaluation ──", _ANSI_DIM))
+    if not compact:
+        print(_colored(f"\n{_RULE_SEP} Phase 4: per-command rule evaluation {_RULE_SEP}", _ANSI_DIM))
+    else:
+        print()
     governing: Optional[Rule] = None
 
     for cmd_text in sub_commands:
@@ -1330,8 +1374,9 @@ def cmd_audit(command: str, permission_mode: str = "default") -> None:
         if all(t.strip("\\") == "" for t in tokens):
             continue
 
-        print(f"\n  {_colored('→ ' + cmd_text, _ANSI_BOLD)}")
-        print(f"    tokens: {tokens}")
+        if not compact:
+            print(f"\n  {_colored(_RARR + ' ' + cmd_text, _ANSI_BOLD)}")
+            print(f"    tokens: {tokens}")
 
         first = tokens[0].lower()
         positions: set[int] = set(index.get(first, []))
@@ -1345,20 +1390,33 @@ def cmd_audit(command: str, permission_mode: str = "default") -> None:
                 is_best = winner is None or _beats(rule, winner)
                 if is_best:
                     winner = rule
-                c = _DECISION_COLOR.get(rule.action.value, "")
-                best_tag = _colored(" ← best", _ANSI_CYAN) if is_best else ""
-                print(f"    {_colored('✓', c)} {rule.id:<14} {_colored(rule.action.value, c):<18}"
-                      f" score={rule.specificity.content_score:<4} {rule.normalized}{best_tag}")
+                if not compact:
+                    c = _DECISION_COLOR.get(rule.action.value, "")
+                    best_tag = _colored(f" {_ARR} best", _ANSI_CYAN) if is_best else ""
+                    print(f"    {_colored(_CHK, c)} {rule.id:<14} {_colored(rule.action.value, c):<18}"
+                          f" score={rule.specificity.content_score:<4} {rule.normalized}{best_tag}")
             else:
-                print(f"    {_colored('·', _ANSI_DIM)} {rule.id:<14} {_colored(rule.action.value, _ANSI_DIM):<18}"
-                      f" score={rule.specificity.content_score:<4} {rule.normalized}")
+                if not compact:
+                    print(f"    {_colored(_DOT, _ANSI_DIM)} {rule.id:<14} {_colored(rule.action.value, _ANSI_DIM):<18}"
+                          f" score={rule.specificity.content_score:<4} {rule.normalized}")
 
         if winner is None:
-            print(f"    {_colored('NO MATCH', _ANSI_YELLOW)} → fallback ask")
+            if compact:
+                cmd_label = cmd_text[:50]
+                print(f"  {_colored('NO MATCH', _ANSI_YELLOW):<18} {cmd_label}")
+            else:
+                print(f"    {_colored('NO MATCH', _ANSI_YELLOW)} {_RARR} fallback ask")
             effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
             print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}"
                   f" (no rule matched sub-command: {tokens[0]})")
             return
+
+        if compact:
+            c = _DECISION_COLOR.get(winner.action.value, "")
+            cmd_label = cmd_text[:50]
+            hint_str = f"  # {winner.hint}" if winner.hint else ""
+            print(f"  {_cpad(winner.action.value, c, 10)} {winner.id:<14} {winner.normalized}"
+                  f"  {_colored(cmd_label, _ANSI_DIM)}{hint_str}")
 
         if winner.action in (Action.DENY, Action.ASK, Action.REQUIRE_ASK):
             governing = winner
@@ -1375,12 +1433,13 @@ def cmd_audit(command: str, permission_mode: str = "default") -> None:
 
     effective, reason_override = _effective_decision(governing.action.value, "PreToolUse", permission_mode)
     ec = _DECISION_COLOR.get(effective, "")
-    print(f"\n{_colored('Governing:', _ANSI_BOLD)}  {governing.id} line={governing.line}"
-          f"  {governing.action.value}  {governing.normalized}")
-    if governing.hint:
-        print(f"            hint: {governing.hint}")
-    if reason_override:
-        print(f"            escalated in mode={permission_mode}")
+    if not compact:
+        print(f"\n{_colored('Governing:', _ANSI_BOLD)}  {governing.id} line={governing.line}"
+              f"  {governing.action.value}  {governing.normalized}")
+        if governing.hint:
+            print(f"            hint: {governing.hint}")
+        if reason_override:
+            print(f"            escalated in mode={permission_mode}")
     print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, ec)}")
 
 
@@ -1438,7 +1497,7 @@ def cmd_replay(date_str: str, permission_mode: str = "default") -> None:
     print(f"Policy:    {CONF_PATH}")
     print(f"Mode:      {permission_mode}\n")
     print(f"{'#':<5} {'old':<12} {'new':<12} {'delta':<8} command")
-    sep = "\u2500" * 80
+    sep = _SEP_CHAR * 80
     print(sep)
 
     for i, entry in enumerate(entries):
@@ -1476,7 +1535,7 @@ def cmd_replay(date_str: str, permission_mode: str = "default") -> None:
             new_c = _DECISION_COLOR.get(new_decision, "")
             delta = _colored("CHANGED", _ANSI_RED)
             cmd_display = command[:60] if command else " ".join(tokens)[:60]
-            print(f"{total:<5} {_colored(old_effective, old_c):<22} {_colored(new_decision, new_c):<22}"
+            print(f"{total:<5} {_cpad(old_effective, old_c, 12)} {_cpad(new_decision, new_c, 12)}"
                   f" {delta:<18} {cmd_display}")
 
     print(sep)
@@ -1485,9 +1544,9 @@ def cmd_replay(date_str: str, permission_mode: str = "default") -> None:
           f"Skipped: {skipped}")
 
     if changed == 0:
-        print(_colored("\n✓ No outcome changes — current config matches logged behavior.", _ANSI_GREEN))
+        print(_colored(f"\n{_CHK} No outcome changes -- current config matches logged behavior.", _ANSI_GREEN))
     else:
-        print(_colored(f"\n⚠ {changed} command(s) would produce different outcomes with current config.", _ANSI_YELLOW))
+        print(_colored(f"\n{_WARN} {changed} command(s) would produce different outcomes with current config.", _ANSI_YELLOW))
         print("  Run --audit \"<command>\" on specific commands to investigate.")
 
 
@@ -1860,6 +1919,8 @@ def main() -> None:
                         help="Permission mode for --audit/--replay (default, dontAsk, bypassPermissions)")
     parser.add_argument("--no-color", action="store_true",
                         help="Disable ANSI color codes in output (auto-set when stdout is not a tty)")
+    parser.add_argument("--compact", action="store_true",
+                        help="Compact audit output: one line per sub-command showing only the governing rule")
     args, _ = parser.parse_known_args()
 
     if args.no_color:
@@ -1875,7 +1936,7 @@ def main() -> None:
         return
 
     if args.audit is not None:
-        cmd_audit(args.audit, permission_mode=args.mode)
+        cmd_audit(args.audit, permission_mode=args.mode, compact=args.compact)
         return
 
     if args.replay is not None:
