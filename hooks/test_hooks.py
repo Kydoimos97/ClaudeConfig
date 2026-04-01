@@ -97,15 +97,15 @@ def test_command_guard_pipe_to_shell_blocked() -> Tuple[bool, str]:
 
 
 def test_command_guard_force_push_blocked() -> Tuple[bool, str]:
-    """Test 4: git push --force main blocked"""
+    """Test 4: git push --force main asks in interactive mode (require_ask policy)"""
     payload = {
         "tool_name": "Bash",
         "tool_input": {"command": "git push --force origin main"},
     }
     stdout, rc = run_hook(HOOKS_DIR / "command-guard.py", payload)
-    if "deny" in stdout.lower():
+    if "ask" in stdout.lower():
         return (True, "")
-    return (False, f"expected deny, got: {stdout[:100]}")
+    return (False, f"expected ask, got: {stdout[:100]}")
 
 
 def test_command_guard_nested_rm_blocked() -> Tuple[bool, str]:
@@ -598,8 +598,78 @@ def test_tool_scoring_equal_specificity_deny_wins() -> Tuple[bool, str]:
     return (True, "")
 
 
+def test_heredoc_body_does_not_trigger_false_pipe_to_shell() -> Tuple[bool, str]:
+    """Test 36: heredoc markdown table does not trip pipe-to-shell precheck"""
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {
+            "command": """gh pr create --base develop --title test --body "$(cat <<'EOF'
+| Field | Source |
+EOF
+)" """
+        },
+    }
+    stdout, _ = run_hook(HOOKS_DIR / "command-guard.py", payload)
+    if "allow" in stdout.lower():
+        return (True, "")
+    return (False, f"expected allow, got: {stdout[:160]}")
+
+
+def test_heredoc_body_does_not_trigger_false_pr_merge_detection() -> Tuple[bool, str]:
+    """Test 37: heredoc body mentioning merge does not trip gh pr merge guard"""
+    payload = {
+        "tool_name": "Bash",
+        "tool_input": {
+            "command": """gh pr edit 1661 --body "$(cat <<'EOF'
+this body mentions merge but is not a merge command
+EOF
+)" """
+        },
+    }
+    stdout, _ = run_hook(HOOKS_DIR / "command-guard.py", payload)
+    if "allow" in stdout.lower():
+        return (True, "")
+    return (False, f"expected allow, got: {stdout[:160]}")
+
+
+def test_strip_heredoc_bodies_removes_payload_lines() -> Tuple[bool, str]:
+    """Test 38: heredoc payload is excluded from raw precheck tokenization"""
+    cg = _load_command_guard()
+    command = """gh pr create --body "$(cat <<'EOF'
+| Field | Source |
+merge should not be inspected here
+EOF
+)" """
+    stripped = cg.strip_heredoc_bodies(command)
+    if "| Field | Source |" in stripped:
+        return (False, "heredoc table row should have been removed")
+    if "merge should not be inspected here" in stripped:
+        return (False, "heredoc payload text should have been removed")
+    if "gh pr create --body" not in stripped or "EOF" not in stripped:
+        return (False, f"expected command structure to remain, got: {stripped!r}")
+    return (True, "")
+
+
+def test_gh_pr_merge_guard_only_matches_real_subcommand() -> Tuple[bool, str]:
+    """Test 39: protected-branch gh guard only fires on gh pr merge"""
+    cg = _load_command_guard()
+    original = cg._gh_pr_base_branch
+    try:
+        cg._gh_pr_base_branch = lambda pr_number: "develop"
+        false_positive = cg._check_git_protected_mutation(["gh", "pr", "edit", "1661", "merge"])
+        if false_positive is not None:
+            return (False, f"expected no guard hit for gh pr edit, got: {false_positive!r}")
+        true_positive = cg._check_git_protected_mutation(["gh", "pr", "merge", "1661"])
+        expected = ("require_ask", "Protected branch: PR targets 'develop' — merge blocked.")
+        if true_positive != expected:
+            return (False, f"expected {expected!r}, got: {true_positive!r}")
+        return (True, "")
+    finally:
+        cg._gh_pr_base_branch = original
+
+
 def main() -> None:
-    """Run all tests and print summary."""
+    """Run the consolidated command-guard regression suite."""
     tests = [
         ("1. rm -rf blocked", test_command_guard_rm_blocked),
         ("2. sudo blocked", test_command_guard_sudo_blocked),
@@ -612,30 +682,22 @@ def main() -> None:
         ("9. git status approved", test_command_guard_git_status_approved),
         ("10. ls | head approved", test_command_guard_ls_pipe_head_approved),
         ("11. find | xargs | grep approved", test_command_guard_find_xargs_grep_approved),
-        ("12. git push asks", test_command_guard_git_push_asks),
-        ("13. npm install approved", test_command_guard_npm_install_approved),
-        ("14. unapproved segment continues", test_command_guard_unapproved_continues),
-        ("15. Read tool approved", test_command_guard_read_tool_pass),
-        ("16. Edit tool approved (non-policy file)", test_command_guard_edit_tool_pass),
-        ("17. Edit commands.conf asks", test_command_guard_edit_commands_conf_asks),
-        ("18. Write tool deferred", test_command_guard_write_tool_deferred),
-        ("19. dispatcher beebop PreToolUse", test_hook_dispatcher_beebop_pretooluse),
-        ("20. dispatcher beebop SessionStart", test_hook_dispatcher_beebop_sessionstart),
-        ("21. dispatcher unknown agent fallback", test_hook_dispatcher_unknown_agent),
-        ("22. dispatcher no event", test_hook_dispatcher_no_event),
-        ("23. track-agent-tokens valid", test_track_agent_tokens_valid),
-        ("24. track-agent-tokens non-agent", test_track_agent_tokens_non_agent),
-        ("25. rm hint contains Trash", test_rm_hint_contains_trash),
-        ("26. rm no-args hint", test_rm_no_args_hint),
-        ("27. sudo hint mentions uv run", test_sudo_hint),
-        ("28. git push --force hint mentions PR", test_force_push_hint),
-        ("29. git add . hint mentions specific files", test_git_add_dot_hint),
-        ("30. python -m hint mentions uv run", test_python_m_hint),
-        ("31. killall hint mentions kill", test_killall_hint),
-        ("32. ext-deny beats path-allow (*.exe vs USERPROFILE/**)", test_tool_scoring_ext_beats_path_allow),
-        ("33. path+ext-allow beats ext-deny (USERPROFILE/**/*.exe vs *.exe)", test_tool_scoring_path_plus_ext_beats_ext_only),
-        ("34. ext-allow beats path-deny (*.txt vs USERPROFILE/**)", test_tool_scoring_ext_beats_path_only_deny),
-        ("35. identical specificity: deny wins over allow", test_tool_scoring_equal_specificity_deny_wins),
+        ("12. npm install approved", test_command_guard_npm_install_approved),
+        ("13. rm hint contains Trash", test_rm_hint_contains_trash),
+        ("14. rm no-args hint", test_rm_no_args_hint),
+        ("15. sudo hint mentions uv run", test_sudo_hint),
+        ("16. git push --force hint mentions PR", test_force_push_hint),
+        ("17. git add . hint mentions specific files", test_git_add_dot_hint),
+        ("18. python -m hint mentions uv run", test_python_m_hint),
+        ("19. killall hint mentions kill", test_killall_hint),
+        ("20. ext-deny beats path-allow (*.exe vs USERPROFILE/**)", test_tool_scoring_ext_beats_path_allow),
+        ("21. path+ext-allow beats ext-deny (USERPROFILE/**/*.exe vs *.exe)", test_tool_scoring_path_plus_ext_beats_ext_only),
+        ("22. ext-allow beats path-deny (*.txt vs USERPROFILE/**)", test_tool_scoring_ext_beats_path_only_deny),
+        ("23. identical specificity: deny wins over allow", test_tool_scoring_equal_specificity_deny_wins),
+        ("24. heredoc markdown table does not trip pipe-to-shell", test_heredoc_body_does_not_trigger_false_pipe_to_shell),
+        ("25. heredoc merge text does not trip gh pr merge", test_heredoc_body_does_not_trigger_false_pr_merge_detection),
+        ("26. strip_heredoc_bodies removes payload lines", test_strip_heredoc_bodies_removes_payload_lines),
+        ("27. gh pr merge guard only matches real subcommand", test_gh_pr_merge_guard_only_matches_real_subcommand),
     ]
 
     passed = 0

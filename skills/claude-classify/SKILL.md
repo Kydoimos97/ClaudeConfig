@@ -15,7 +15,7 @@ Use this skill for cheap local routing and categorization work.
 - deciding whether a task is retrieval, coding, or synthesis
 - classifying work as bug, refactor, feature, or cleanup
 - identifying likely risk level from a short description
-- choosing between Claude, Codex, and Kiro for a bounded task
+- choosing between Kiro, Codex, and main for a bounded task
 - grouping a short list into categories
 
 ## Do not use when
@@ -27,11 +27,14 @@ Use this skill for cheap local routing and categorization work.
 
 ## Routing model
 
-Thinking layer (decisions and reasoning):
-- Socrates: complex decisions, conflicting results, judgment calls requiring deep analysis
+Research and retrieval layer:
+- Kiro: web search, file reads, log triage, API inspection, output analysis
 
-Execution layer (action and retrieval):
-- Worker: all execution — code, files, bash, kiro-cli, codex exec, skill invocation
+Implementation layer:
+- Codex: code generation, refactoring, patch creation, diff review
+
+Orchestration layer:
+- Main: decisions, planning, tool invocation, quality gating, anything requiring judgment
 
 ## Output contract
 
@@ -41,7 +44,7 @@ Return:
 Type: <bug|feature|refactor|research|triage|rewrite|review|config|other>
 
 ## Recommended delegate
-<worker|socrates>
+<kiro|codex|main>
 
 ## Reason
 <one to three short sentences>

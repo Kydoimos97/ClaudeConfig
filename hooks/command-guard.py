@@ -41,6 +41,14 @@ SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
 
 SCHEMA_VERSION = 1
 
+# Populated at runtime from &[-] Git(...) directives in commands.conf.
+# Falls back to this default if no directive is found.
+PROTECTED_BRANCHES: list[str] = [
+    "main", "master", "develop", "prod", "production",
+    "qa", "dev", "staging",
+    "release*",
+]
+
 
 # ---------------------------------------------------------------------------
 # Data models
@@ -94,6 +102,24 @@ class ToolRule:
     action: Action
     tool_name: str            # lowercased
     path_pattern: Optional[str]  # env-expanded, lowercased; None = match any target
+    hint: Optional[str] = None
+
+
+@dataclass
+class Directive:
+    """Meta-rule parsed from &[action] Handler(args) syntax.
+
+    Currently supported handlers:
+      Git(branch1,branch2,...)  — declares protected branches; the runtime
+                                  interceptor denies push/merge/rebase/cherry-pick/reset
+                                  that would mutate any listed branch.
+    """
+    id: str
+    line: int
+    raw: str
+    action: Action
+    handler: str          # e.g. "git" (lowercased)
+    args: list[str]       # e.g. ["main", "master", "qa", "release*"]
     hint: Optional[str] = None
 
 
@@ -192,6 +218,13 @@ _TOOL_PREFIXES: dict[str, Action] = {
     "$[?]": Action.REQUIRE_ASK,
 }
 
+_DIRECTIVE_PREFIXES: dict[str, Action] = {
+    "&[+]": Action.ALLOW,
+    "&[-]": Action.DENY,
+    "&[~]": Action.ASK,
+    "&[?]": Action.REQUIRE_ASK,
+}
+
 
 def _expand_braces(line: str, prefix: str) -> list[str]:
     """Expand {a,b,c} alternations in the pattern portion of a rule line.
@@ -284,9 +317,40 @@ def _parse_tool_rule(stripped: str, prefix: str, action: Action, line_num: int) 
     )
 
 
-def parse_conf(path: Path) -> tuple[list[Rule], list[ToolRule]]:
+def _parse_directive(stripped: str, prefix: str, action: Action, line_num: int) -> Directive:
+    """Parse &[action] Handler(arg1,arg2,...) #hint syntax."""
+    rest = stripped[len(prefix) + 1:].strip()
+    hint: Optional[str] = None
+    if " #" in rest:
+        rest, hint_raw = rest.split(" #", 1)
+        hint = hint_raw.strip() or None
+
+    m = re.match(r"(\w+)\(([^)]*)\)", rest.strip())
+    if not m:
+        raise ValueError(
+            f"Line {line_num}: invalid directive syntax — expected Handler(args): {rest!r}"
+        )
+
+    handler = m.group(1).lower()
+    args = [a.strip().lower() for a in m.group(2).split(",") if a.strip()]
+    if not args:
+        raise ValueError(f"Line {line_num}: directive has no arguments: {rest!r}")
+
+    return Directive(
+        id=f"rule_{line_num}",
+        line=line_num,
+        raw=stripped,
+        action=action,
+        handler=handler,
+        args=args,
+        hint=hint,
+    )
+
+
+def parse_conf(path: Path) -> tuple[list[Rule], list[ToolRule], list[Directive]]:
     bash_rules: list[Rule] = []
     tool_rules: list[ToolRule] = []
+    directives: list[Directive] = []
     errors: list[str] = []
 
     with open(path, "r", encoding="utf-8") as f:
@@ -297,16 +361,29 @@ def parse_conf(path: Path) -> tuple[list[Rule], list[ToolRule]]:
 
             matched = False
 
-            for prefix, action in _TOOL_PREFIXES.items():
+            # Directive rules (&[...])
+            for prefix, action in _DIRECTIVE_PREFIXES.items():
                 if stripped.startswith(prefix + " ") or stripped == prefix:
-                    for expanded in _expand_braces(stripped, prefix):
-                        try:
-                            tool_rules.append(_parse_tool_rule(expanded, prefix, action, line_num))
-                        except ValueError as exc:
-                            errors.append(str(exc))
+                    try:
+                        directives.append(_parse_directive(stripped, prefix, action, line_num))
+                    except ValueError as exc:
+                        errors.append(str(exc))
                     matched = True
                     break
 
+            # Tool rules ($[...])
+            if not matched:
+                for prefix, action in _TOOL_PREFIXES.items():
+                    if stripped.startswith(prefix + " ") or stripped == prefix:
+                        for expanded in _expand_braces(stripped, prefix):
+                            try:
+                                tool_rules.append(_parse_tool_rule(expanded, prefix, action, line_num))
+                            except ValueError as exc:
+                                errors.append(str(exc))
+                        matched = True
+                        break
+
+            # Bash rules ([...])
             if not matched:
                 for prefix, action in _BASH_PREFIXES.items():
                     if stripped.startswith(prefix + " ") or stripped == prefix:
@@ -324,7 +401,7 @@ def parse_conf(path: Path) -> tuple[list[Rule], list[ToolRule]]:
     if errors:
         raise ValueError("Parse errors in commands.conf:\n" + "\n".join(errors))
 
-    return bash_rules, tool_rules
+    return bash_rules, tool_rules, directives
 
 
 # ---------------------------------------------------------------------------
@@ -378,7 +455,7 @@ def _rule_to_dict(rule: Rule) -> dict:
 
 
 def compile_conf(conf_path: Path) -> dict:
-    bash_rules, _ = parse_conf(conf_path)
+    bash_rules, _, _ = parse_conf(conf_path)
     index = build_index(bash_rules)
     return {
         "version": SCHEMA_VERSION,
@@ -428,6 +505,24 @@ def _rules_from_compiled(compiled: dict) -> tuple[list[Rule], dict[str, list[int
     return rules, compiled["index"]
 
 
+def _apply_directives(directives: list[Directive], debug: bool = False) -> None:
+    """Apply parsed directives to module-level state."""
+    global PROTECTED_BRANCHES
+    git_branches: list[str] = []
+
+    for d in directives:
+        if d.handler == "git":
+            git_branches.extend(d.args)
+            if debug:
+                print(
+                    f"[debug] directive {d.id}: Git branches = {d.args}",
+                    file=sys.stderr,
+                )
+
+    if git_branches:
+        PROTECTED_BRANCHES = git_branches
+
+
 def load_policy(
     conf_path: Path,
     json_path: Path,
@@ -465,10 +560,12 @@ def load_policy(
     bash_rules, index = _rules_from_compiled(compiled)
 
     try:
-        _, tool_rules = parse_conf(conf_path)
+        _, tool_rules, directives = parse_conf(conf_path)
     except ValueError as exc:
         print(f"command-guard: fatal — {exc}", file=sys.stderr)
         sys.exit(1)
+
+    _apply_directives(directives, debug=debug)
 
     return bash_rules, index, tool_rules
 
@@ -738,6 +835,48 @@ def normalize(command: str) -> str:
     return command
 
 
+_HEREDOC_OPEN_RE = re.compile(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1")
+
+
+def strip_heredoc_bodies(command: str) -> str:
+    """Strip heredoc payload lines while preserving the surrounding command.
+
+    Raw pre-checks operate on a whitespace-split token stream and should not
+    treat heredoc body content as shell syntax. This keeps markers like
+    markdown table pipes or words like "merge" inside PR bodies from tripping
+    shell-level guards.
+    """
+    lines = command.splitlines(keepends=True)
+    if not lines:
+        return command
+
+    cleaned: list[str] = []
+    pending: list[tuple[str, bool]] = []
+
+    for line in lines:
+        if pending:
+            stripped = line.lstrip()
+            matched = False
+            for idx, (delimiter, allow_indent) in enumerate(pending):
+                candidate = stripped if allow_indent else line
+                if candidate.strip("\r\n") == delimiter:
+                    cleaned.append(line)
+                    pending.pop(idx)
+                    matched = True
+                    break
+            if matched:
+                continue
+            continue
+
+        cleaned.append(line)
+        for match in _HEREDOC_OPEN_RE.finditer(line):
+            op = match.group(0)
+            delimiter = match.group(2)
+            pending.append((delimiter, op.startswith("<<-")))
+
+    return "".join(cleaned)
+
+
 def extract_commands(command: str) -> list[str]:
     """Extract individual command nodes from a compound shell expression."""
     try:
@@ -828,6 +967,189 @@ def _raw_pass(
     winner, _, _, _ = evaluate_bash(bash_rules, index, tokens, debug=debug)
     if winner is not None and winner.action in (Action.DENY, Action.ASK, Action.REQUIRE_ASK):
         return winner
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Git protected-branch mutation guard
+# ---------------------------------------------------------------------------
+
+# Commands that mutate the CURRENT branch (target = HEAD).
+# If you're ON a protected branch, these are denied.
+_GIT_BRANCH_MUTATORS: frozenset[str] = frozenset([
+    "merge", "rebase", "cherry-pick", "reset",
+])
+
+
+def _is_protected_branch(branch: str) -> bool:
+    """Check if a branch name matches any entry in PROTECTED_BRANCHES."""
+    lower = branch.lower()
+    for pattern in PROTECTED_BRANCHES:
+        if "*" in pattern or "?" in pattern:
+            if fnmatch.fnmatchcase(lower, pattern):
+                return True
+        elif lower == pattern:
+            return True
+    return False
+
+
+def _git_current_branch() -> Optional[str]:
+    """Resolve the current git branch, or None if not in a repo / detached."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            branch = result.stdout.strip()
+            if branch == "HEAD":
+                return None
+            return branch or None
+    except Exception:
+        pass
+    return None
+
+
+def _gh_pr_base_branch(pr_number: str) -> Optional[str]:
+    """Resolve the base branch for a GitHub PR number via gh CLI."""
+    try:
+        result = subprocess.run(
+            ["gh", "pr", "view", pr_number, "--json", "baseRefName"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            payload = json.loads(result.stdout or "{}")
+            base = payload.get("baseRefName")
+            return base.strip() if isinstance(base, str) and base.strip() else None
+    except Exception:
+        pass
+    return None
+
+
+def _extract_push_target(tokens: list[str]) -> Optional[str]:
+    """Extract the target branch from a git push command.
+
+    Returns:
+      - The explicit target branch name if one is specified
+      - "head" if the push implicitly targets the current branch
+      - None if this isn't a git push command
+
+    Handles:
+      git push                         → head (bare push)
+      git push origin                  → head (remote only)
+      git push origin HEAD             → head (explicit HEAD)
+      git push -u origin HEAD          → head (flags stripped)
+      git push origin feat/foo         → feat/foo (explicit target)
+      git push origin HEAD:main        → main (refspec target)
+      git push origin feat/foo:develop → develop (refspec target)
+    """
+    if "push" not in tokens:
+        return None
+
+    try:
+        push_idx = tokens.index("push")
+    except ValueError:
+        return None
+
+    # Non-flag args after "push" (skip --delete etc. which are handled by conf rules)
+    args = [t for t in tokens[push_idx + 1:] if not t.startswith("-")]
+
+    if len(args) == 0:
+        return "head"
+    if len(args) == 1:
+        return "head"  # just remote name
+
+    ref = args[1]
+    # Refspec: local:remote — target is the remote side
+    if ":" in ref:
+        target = ref.split(":", 1)[1]
+        return target if target else "head"
+
+    if ref == "head":
+        return "head"
+
+    return ref
+
+
+def _check_git_protected_mutation(
+    tokens: list[str],
+    debug: bool = False,
+) -> Optional[tuple[str, str]]:
+    """Detect git/gh operations that would mutate a protected branch.
+
+    Two dimensions checked:
+      1. PUSH — is the target branch (explicit or implicit) protected?
+      2. MUTATORS (merge, rebase, cherry-pick, reset) — is the current
+         branch protected?  Merging main INTO a feature branch is fine;
+         merging a feature branch INTO main is not.
+      3. GH CLI — gh pr merge when the PR base branch is protected.
+
+    Returns (decision, reason), or None if the operation is safe.
+    """
+    lower = [t.lower() for t in tokens]
+
+    is_git = "git" in lower
+    is_gh = lower[0] == "gh" if lower else False
+
+    if not is_git and not is_gh:
+        return None
+
+    # --- Git push target check ---
+    if is_git:
+        push_target = _extract_push_target(lower)
+        if push_target is not None:
+            if push_target == "head":
+                branch = _git_current_branch()
+                if debug:
+                    print(f"[debug] git-protect: implicit push, current={branch}", file=sys.stderr)
+                    if branch is None:
+                        print("[debug] git-protect: detached HEAD — skipping protection", file=sys.stderr)
+                if branch and _is_protected_branch(branch):
+                    return "require_ask", (
+                        f"Protected branch: you are on '{branch}' and this push would "
+                        f"target it directly. Open a PR instead. "
+                        f"Checkout a feature branch first (e.g. git checkout -b feat/your-change)."
+                    )
+            elif _is_protected_branch(push_target):
+                return "require_ask", (
+                    f"Protected branch: push target '{push_target}' cannot be pushed to "
+                    f"directly — open a PR instead."
+                )
+            return None
+
+        # --- Current-branch mutation check (merge, rebase, cherry-pick, reset) ---
+        for mutator in _GIT_BRANCH_MUTATORS:
+            if mutator in lower:
+                branch = _git_current_branch()
+                if debug:
+                    print(f"[debug] git-protect: '{mutator}' on current={branch}", file=sys.stderr)
+                    if branch is None:
+                        print("[debug] git-protect: detached HEAD — skipping protection", file=sys.stderr)
+                if branch and _is_protected_branch(branch):
+                    return "require_ask", (
+                        f"Protected branch: '{mutator}' would modify '{branch}'. "
+                        f"Checkout a feature branch first, then {mutator} there."
+                    )
+                break
+
+    # --- gh CLI checks ---
+    if lower[:3] == ["gh", "pr", "merge"]:
+        pr_number = next((t for t in lower if t.isdigit()), None)
+        base = _gh_pr_base_branch(pr_number) if pr_number else None
+        if debug:
+            print(
+                f"[debug] git-protect: gh pr merge pr={pr_number} base={base}",
+                file=sys.stderr,
+            )
+        if base and _is_protected_branch(base):
+            if "--admin" in lower:
+                return "require_ask", (
+                    f"Protected branch: PR targets '{base}' and uses --admin — approval required."
+                )
+            return "require_ask", (
+                f"Protected branch: PR targets '{base}' — merge blocked."
+            )
+
     return None
 
 
@@ -923,7 +1245,7 @@ def _tool_target(tool_name: str, tool_input: dict) -> str:
     return ""
 
 
-_NON_INTERACTIVE_MODES: frozenset[str] = frozenset({"dontAsk", "bypassPermissions"})
+_NON_INTERACTIVE_MODES: frozenset[str] = frozenset({"dontAsk", "bypassPermissions", "acceptEdits"})
 
 _DONT_ASK_DENY_REASON: str = (
     "Permission to use this command has been denied because Claude Code is running in "
@@ -1109,10 +1431,12 @@ def check_settings_conflicts(
 def cmd_verify() -> None:
     print(f"Verifying: {CONF_PATH}\n")
     try:
-        bash_rules, tool_rules = parse_conf(CONF_PATH)
+        bash_rules, tool_rules, directives = parse_conf(CONF_PATH)
     except ValueError as exc:
         print(f"FAIL — {exc}")
         sys.exit(1)
+
+    _apply_directives(directives)
 
     errors: list[str] = []
     warnings: list[str] = []
@@ -1161,13 +1485,22 @@ def cmd_verify() -> None:
 
     print(f"Bash rules : {len(bash_rules)}")
     print(f"Tool rules : {len(tool_rules)}")
+    print(f"Directives : {len(directives)}")
     print(f"Index keys : {len(index)}")
+    if PROTECTED_BRANCHES:
+        print(f"Protected  : {', '.join(PROTECTED_BRANCHES)}")
     if warnings:
         print(f"Warnings   : {len(warnings)}")
     if settings_conflicts:
         flagged = sum(1 for c in settings_conflicts if "WARN" in c)
         print(f"Conflicts  : {flagged} potential settings.json conflicts")
     print(f"Output     : {JSON_PATH}\n")
+
+    if directives:
+        print("--- Directives ---")
+        for d in directives:
+            print(f"  {d.id:<14} line={d.line:<4} {d.action.value:<5}  {d.handler}({', '.join(d.args)})")
+        print()
 
     print("--- Bash rules ---")
     for rule in bash_rules:
@@ -1187,34 +1520,64 @@ def cmd_verify() -> None:
 # CLI: --usage
 # ---------------------------------------------------------------------------
 
-def cmd_usage() -> None:
+def cmd_usage(days: int = 1) -> None:
     if not LOG_DIR.exists():
         print("No log directory found.")
         return
+
+    from datetime import timedelta
+    cutoff = datetime.now() - timedelta(days=days)
+    cutoff_str = cutoff.strftime("%Y-%m-%d")
 
     log_files = sorted(LOG_DIR.glob("*_commands.jsonl"))
     if not log_files:
         print("No log files found.")
         return
 
+    # Filter to files within the date range
+    filtered = []
+    for lf in log_files:
+        # Filename format: YYYY-MM-DD_commands.jsonl
+        date_part = lf.stem.replace("_commands", "")
+        if date_part >= cutoff_str:
+            filtered.append(lf)
+
+    if not filtered:
+        print(f"No log files found in the last {days} day(s) (since {cutoff_str}).")
+        return
+
+    bash_rules, _, tool_rules = load_policy(CONF_PATH, JSON_PATH)
+    _, _, directives = parse_conf(CONF_PATH)
+    rule_lookup: dict[str, str] = {"defer": "no matching rule"}
+    for rule in bash_rules:
+        rule_lookup[rule.id] = f"{rule.action.value} {rule.normalized}"
+    for rule in tool_rules:
+        target = f" {rule.path_pattern}" if rule.path_pattern is not None else ""
+        rule_lookup[rule.id] = f"{rule.action.value} {rule.tool_name}{target}"
+    for directive in directives:
+        args = ",".join(directive.args)
+        rule_lookup[directive.id] = f"{directive.action.value} {directive.handler}({args})"
+
     counts: dict[str, dict[str, int]] = {}
     total = 0
-    skipped = 0
+    malformed: list[tuple[str, int, str]] = []
 
-    for lf in log_files:
+    for lf in filtered:
+        line_num = 0
         with open(lf, "r", encoding="utf-8") as f:
             for raw_line in f:
+                line_num += 1
                 raw_line = raw_line.strip()
                 if not raw_line:
                     continue
                 try:
                     entry = json.loads(raw_line)
-                except json.JSONDecodeError:
-                    skipped += 1
+                except json.JSONDecodeError as exc:
+                    malformed.append((lf.name, line_num, f"JSON: {exc}"))
                     continue
                 result = entry.get("result")
                 if not result:
-                    skipped += 1
+                    malformed.append((lf.name, line_num, "missing 'result' key"))
                     continue
                 rule_id = result.get("rule_id", "defer")
                 decision = result.get("decision", "unknown")
@@ -1223,23 +1586,33 @@ def cmd_usage() -> None:
                 total += 1
 
     if not counts:
-        print("No new-format log entries found.")
+        print("No valid log entries found.")
         return
 
-    print(f"Total: {total}  Skipped (old format): {skipped}\n")
-    print(f"{'rule_id':<16}  {'allow':>6}  {'deny':>6}  {'ask':>6}  {'defer':>6}  {'total':>6}")
-    print("-" * 56)
+    date_range = f"{filtered[0].stem.replace('_commands', '')} to {filtered[-1].stem.replace('_commands', '')}"
+    print(f"Period: {date_range}  ({len(filtered)} file(s), {days} day(s))")
+    print(f"Total: {total}\n")
+    print(f"{'rule_id':<16}  {'allow':>6}  {'deny':>6}  {'ask':>6}  {'defer':>6}  {'total':>6}  rule")
+    print("-" * 120)
     for rule_id in sorted(counts.keys()):
         d = counts[rule_id]
         row = sum(d.values())
+        rule_text = rule_lookup.get(rule_id, "(rule not found in current commands.conf)")
         print(
             f"{rule_id:<16}  "
             f"{d.get('allow', 0):>6}  "
             f"{d.get('deny', 0):>6}  "
             f"{d.get('ask', 0):>6}  "
             f"{d.get('defer', 0):>6}  "
-            f"{row:>6}"
+            f"{row:>6}  {rule_text}"
         )
+
+    if malformed:
+        print(f"\n{len(malformed)} malformed line(s):")
+        for fname, ln, reason in malformed[:10]:
+            print(f"  {fname}:{ln}  {reason}")
+        if len(malformed) > 10:
+            print(f"  ... {len(malformed) - 10} more")
 
 
 # ---------------------------------------------------------------------------
@@ -1285,39 +1658,86 @@ def _cpad(text: str, color: str, width: int) -> str:
     return colored.ljust(width + ansi_overhead)
 
 
-def cmd_audit(command: str, permission_mode: str = "default", compact: bool = False) -> None:
+def _emit_quiet_audit(command: str, decision: str, governing: str) -> None:
+    """Emit a minimal audit summary."""
+    print(f"{command} --> {decision}")
+    print(f"({governing})")
+
+
+def cmd_audit(
+    command: str,
+    permission_mode: str = "default",
+    compact: bool = False,
+    quiet: bool = False,
+) -> None:
     """Trace a command through the full evaluation pipeline, showing every rule."""
     bash_rules, index, tool_rules = load_policy(CONF_PATH, JSON_PATH)
 
-    print(f"{_colored('Auditing:', _ANSI_BOLD)}  {command}")
-    print(f"Mode:      {permission_mode}")
+    if not quiet:
+        print(f"{_colored('Auditing:', _ANSI_BOLD)}  {command}")
+        print(f"Mode:      {permission_mode}")
 
     normalized = normalize(command)
-    raw_tokens = normalized.lower().split()
-    if not compact:
+    precheck_command = strip_heredoc_bodies(normalized)
+    raw_tokens = precheck_command.lower().split()
+    if not compact and not quiet:
         print(f"Tokens:    {raw_tokens}\n")
 
     # --- Phase 1: pipe-to-shell ---
-    if not compact:
+    if not compact and not quiet:
         print(_colored(f"{_RULE_SEP} Phase 1: pipe-to-shell check {_RULE_SEP}", _ANSI_DIM))
     pipe_shell = _check_pipe_to_shell(raw_tokens)
     if pipe_shell:
-        if not compact:
+        if quiet:
+            effective, _ = _effective_decision("deny", "PreToolUse", permission_mode)
+            _emit_quiet_audit(command, effective, f"pipe-to-shell: {pipe_shell}")
+            return
+        if not compact and not quiet:
             print(_colored(f"  BLOCKED  pipe to {pipe_shell} detected {_RARR} deny", _ANSI_RED))
         effective, _ = _effective_decision("deny", "PreToolUse", permission_mode)
         if compact:
             print(f"\n  {_colored('pipe-to-shell', _ANSI_RED)}  {pipe_shell}")
         print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}")
         return
-    if not compact:
+    if not compact and not quiet:
         print(_colored("  pass (no pipe-to-shell)", _ANSI_DIM))
 
+    # --- Phase 1b: protected branch mutation check ---
+    if not compact and not quiet:
+        print(_colored(f"\n{_RULE_SEP} Phase 1b: protected branch guard {_RULE_SEP}", _ANSI_DIM))
+    push_guard = _check_git_protected_mutation(raw_tokens)
+    if push_guard:
+        guard_decision, guard_reason = push_guard
+        if quiet:
+            effective, _ = _effective_decision(guard_decision, "PreToolUse", permission_mode)
+            _emit_quiet_audit(command, effective, f"protected-branch: {guard_reason}")
+            return
+        if not compact and not quiet:
+            color = _DECISION_COLOR.get(guard_decision, _ANSI_RED)
+            label = "BLOCKED" if guard_decision == "deny" else "ASK"
+            print(_colored(f"  {label:<7} {guard_reason}", color))
+        else:
+            color = _DECISION_COLOR.get(guard_decision, _ANSI_RED)
+            print(f"\n  {_colored('protected-branch', color)}  {guard_reason}")
+        effective, _ = _effective_decision(guard_decision, "PreToolUse", permission_mode)
+        print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}")
+        return
+    if not compact and not quiet:
+        print(_colored("  pass (no protected branch mutation)", _ANSI_DIM))
+
     # --- Phase 2: raw pass ---
-    if not compact:
+    if not compact and not quiet:
         print(_colored(f"\n{_RULE_SEP} Phase 2: raw pass (full token stream vs deny/ask rules) {_RULE_SEP}", _ANSI_DIM))
     raw_winner = _raw_pass(raw_tokens, bash_rules, index, debug=False)
     if raw_winner is not None:
         c = _DECISION_COLOR.get(raw_winner.action.value, "")
+        effective, reason_override = _effective_decision(raw_winner.action.value, "PreToolUse", permission_mode)
+        if quiet:
+            governing = f"{raw_winner.id} line={raw_winner.line} {raw_winner.action.value} {raw_winner.normalized}"
+            if reason_override:
+                governing += f" (escalated in mode={permission_mode})"
+            _emit_quiet_audit(command, effective, governing)
+            return
         if compact:
             hint_str = f"  # {raw_winner.hint}" if raw_winner.hint else ""
             print(f"\n  {_colored(raw_winner.action.value, c):<18} {raw_winner.id} line={raw_winner.line}"
@@ -1328,41 +1748,46 @@ def cmd_audit(command: str, permission_mode: str = "default", compact: bool = Fa
                   f"  {raw_winner.normalized}")
             if raw_winner.hint:
                 print(f"       hint: {raw_winner.hint}")
-        effective, reason_override = _effective_decision(raw_winner.action.value, "PreToolUse", permission_mode)
-        if not compact and reason_override:
+        if not compact and not quiet and reason_override:
             print(f"       escalated: {effective}")
         print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}")
         return
-    if not compact:
+    if not compact and not quiet:
         print(_colored("  pass (no deny/ask matched on raw tokens)", _ANSI_DIM))
 
     # --- Phase 3: tree-sitter extraction ---
-    if not compact:
+    if not compact and not quiet:
         print(_colored(f"\n{_RULE_SEP} Phase 3: tree-sitter command extraction {_RULE_SEP}", _ANSI_DIM))
     try:
         sub_commands = extract_commands(normalized)
     except ImportError as exc:
-        if not compact:
+        if quiet:
+            _emit_quiet_audit(command, "deny", f"tree-sitter missing: {exc}")
+            return
+        if not compact and not quiet:
             print(_colored(f"  FAIL  tree-sitter not available: {exc}", _ANSI_RED))
         print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored('deny', _ANSI_RED)} (tree-sitter missing)")
         return
 
     if not sub_commands:
-        if not compact:
+        if not compact and not quiet:
             print(_colored("  no commands in parse tree", _ANSI_YELLOW))
         effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
+        if quiet:
+            _emit_quiet_audit(command, effective, "empty parse -> fallback ask")
+            return
         print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}"
               f" (empty parse {_RARR} fallback ask)")
         return
 
-    if not compact:
+    if not compact and not quiet:
         for i, sc in enumerate(sub_commands):
             print(f"  sub[{i}]: {sc}")
 
     # --- Phase 4: per-command evaluation ---
-    if not compact:
+    if not compact and not quiet:
         print(_colored(f"\n{_RULE_SEP} Phase 4: per-command rule evaluation {_RULE_SEP}", _ANSI_DIM))
-    else:
+    elif compact:
         print()
     governing: Optional[Rule] = None
 
@@ -1374,7 +1799,7 @@ def cmd_audit(command: str, permission_mode: str = "default", compact: bool = Fa
         if all(t.strip("\\") == "" for t in tokens):
             continue
 
-        if not compact:
+        if not compact and not quiet:
             print(f"\n  {_colored(_RARR + ' ' + cmd_text, _ANSI_BOLD)}")
             print(f"    tokens: {tokens}")
 
@@ -1390,23 +1815,26 @@ def cmd_audit(command: str, permission_mode: str = "default", compact: bool = Fa
                 is_best = winner is None or _beats(rule, winner)
                 if is_best:
                     winner = rule
-                if not compact:
+                if not compact and not quiet:
                     c = _DECISION_COLOR.get(rule.action.value, "")
                     best_tag = _colored(f" {_ARR} best", _ANSI_CYAN) if is_best else ""
                     print(f"    {_colored(_CHK, c)} {rule.id:<14} {_colored(rule.action.value, c):<18}"
                           f" score={rule.specificity.content_score:<4} {rule.normalized}{best_tag}")
             else:
-                if not compact:
+                if not compact and not quiet:
                     print(f"    {_colored(_DOT, _ANSI_DIM)} {rule.id:<14} {_colored(rule.action.value, _ANSI_DIM):<18}"
                           f" score={rule.specificity.content_score:<4} {rule.normalized}")
 
         if winner is None:
+            effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
+            if quiet:
+                _emit_quiet_audit(command, effective, f"no rule matched sub-command: {tokens[0]}")
+                return
             if compact:
                 cmd_label = cmd_text[:50]
                 print(f"  {_colored('NO MATCH', _ANSI_YELLOW):<18} {cmd_label}")
             else:
                 print(f"    {_colored('NO MATCH', _ANSI_YELLOW)} {_RARR} fallback ask")
-            effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
             print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}"
                   f" (no rule matched sub-command: {tokens[0]})")
             return
@@ -1427,13 +1855,24 @@ def cmd_audit(command: str, permission_mode: str = "default", compact: bool = Fa
 
     if governing is None:
         effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
+        if quiet:
+            _emit_quiet_audit(command, effective, "no governing rule")
+            return
         print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}"
               f" (no governing rule)")
         return
 
     effective, reason_override = _effective_decision(governing.action.value, "PreToolUse", permission_mode)
+    if quiet:
+        governing_text = (
+            f"{governing.id} line={governing.line} {governing.action.value} {governing.normalized}"
+        )
+        if reason_override:
+            governing_text += f" (escalated in mode={permission_mode})"
+        _emit_quiet_audit(command, effective, governing_text)
+        return
     ec = _DECISION_COLOR.get(effective, "")
-    if not compact:
+    if not compact and not quiet:
         print(f"\n{_colored('Governing:', _ANSI_BOLD)}  {governing.id} line={governing.line}"
               f"  {governing.action.value}  {governing.normalized}")
         if governing.hint:
@@ -1447,44 +1886,90 @@ def cmd_audit(command: str, permission_mode: str = "default", compact: bool = Fa
 # CLI: --replay
 # ---------------------------------------------------------------------------
 
-def cmd_replay(date_str: str, permission_mode: str = "default") -> None:
+def _matches_search(command: str, search: Optional[str]) -> bool:
+    """Case-insensitive OR match for comma-separated search terms."""
+    if not search:
+        return True
+    haystack = command.lower()
+    needles = [part.strip().lower() for part in search.split(",") if part.strip()]
+    if not needles:
+        return True
+    return any(needle in haystack for needle in needles)
+
+
+def cmd_replay(
+    date_str: str,
+    permission_mode: str = "default",
+    search: Optional[str] = None,
+) -> None:
     """Replay logged commands from a date and diff outcomes against current config."""
+    from datetime import timedelta
+
     if not LOG_DIR.exists():
         print("No log directory found.")
         return
 
-    # Normalize date input: accept 03-23-2026, 2026-03-23, etc.
-    for fmt in ("%m-%d-%Y", "%Y-%m-%d", "%m/%d/%Y", "%Y/%m/%d"):
-        try:
-            dt = datetime.strptime(date_str, fmt)
-            break
-        except ValueError:
-            continue
+    # Handle "today" default — try today, fall back to yesterday
+    if date_str == "today":
+        today = datetime.now()
+        log_date = today.strftime("%Y-%m-%d")
+        log_file = LOG_DIR / f"{log_date}_commands.jsonl"
+        if not log_file.exists():
+            yesterday = today - timedelta(days=1)
+            log_date = yesterday.strftime("%Y-%m-%d")
+            log_file = LOG_DIR / f"{log_date}_commands.jsonl"
+            if not log_file.exists():
+                print(f"No log file for today or yesterday.")
+                return
+            print(f"(no log for today, using yesterday: {log_date})\n")
     else:
-        print(f"Could not parse date: {date_str!r}")
-        print("Accepted formats: MM-DD-YYYY, YYYY-MM-DD, MM/DD/YYYY, YYYY/MM/DD")
-        sys.exit(1)
+        # Normalize date input: accept 03-23-2026, 2026-03-23, etc.
+        for fmt in ("%m-%d-%Y", "%Y-%m-%d", "%m/%d/%Y", "%Y/%m/%d"):
+            try:
+                dt = datetime.strptime(date_str, fmt)
+                break
+            except ValueError:
+                continue
+        else:
+            print(f"Could not parse date: {date_str!r}")
+            print("Accepted formats: MM-DD-YYYY, YYYY-MM-DD, MM/DD/YYYY, YYYY/MM/DD")
+            sys.exit(1)
 
-    log_date = dt.strftime("%Y-%m-%d")
-    log_file = LOG_DIR / f"{log_date}_commands.jsonl"
-    if not log_file.exists():
-        print(f"No log file for {log_date}: {log_file}")
-        return
+        log_date = dt.strftime("%Y-%m-%d")
+        log_file = LOG_DIR / f"{log_date}_commands.jsonl"
+        if not log_file.exists():
+            print(f"No log file for {log_date}: {log_file}")
+            return
 
     bash_rules, index, tool_rules = load_policy(CONF_PATH, JSON_PATH)
 
     entries: list[dict] = []
+    malformed: list[tuple[int, str]] = []
+    line_num = 0
+
     with open(log_file, "r", encoding="utf-8") as f:
         for raw_line in f:
+            line_num += 1
             raw_line = raw_line.strip()
             if not raw_line:
                 continue
             try:
-                entries.append(json.loads(raw_line))
-            except json.JSONDecodeError:
+                entry = json.loads(raw_line)
+            except json.JSONDecodeError as exc:
+                malformed.append((line_num, f"JSON: {exc}"))
                 continue
 
-    if not entries:
+            # Validate expected structure
+            if "result" not in entry:
+                malformed.append((line_num, "missing 'result' key"))
+                continue
+            if "normalized" not in entry:
+                malformed.append((line_num, "missing 'normalized' key"))
+                continue
+
+            entries.append(entry)
+
+    if not entries and not malformed:
         print(f"No entries in {log_file}")
         return
 
@@ -1495,8 +1980,11 @@ def cmd_replay(date_str: str, permission_mode: str = "default") -> None:
 
     print(f"{_colored('Replaying', _ANSI_BOLD)} {len(entries)} entries from {log_date}")
     print(f"Policy:    {CONF_PATH}")
-    print(f"Mode:      {permission_mode}\n")
-    print(f"{'#':<5} {'old':<12} {'new':<12} {'delta':<8} command")
+    print(f"Mode:      {permission_mode}")
+    if search:
+        print(f"Search:    {search}")
+    print()
+    print(f"{'#':<5} {'old':<12} {'new':<12} {'delta':<8} details")
     sep = _SEP_CHAR * 80
     print(sep)
 
@@ -1516,8 +2004,11 @@ def cmd_replay(date_str: str, permission_mode: str = "default") -> None:
             continue
 
         total += 1
+        full_command = command if command else " ".join(tokens)
 
-        new_decision = _replay_evaluate(command, tokens, bash_rules, index, tool_rules, permission_mode)
+        new_decision, new_detail = _replay_evaluate(
+            command, tokens, bash_rules, index, tool_rules, permission_mode
+        )
 
         # Normalize old decision for comparison (require_ask → ask in interactive)
         old_effective = old_decision
@@ -1531,23 +2022,48 @@ def cmd_replay(date_str: str, permission_mode: str = "default") -> None:
             unchanged += 1
 
         if is_changed:
+            if not _matches_search(full_command, search):
+                continue
             old_c = _DECISION_COLOR.get(old_effective, "")
             new_c = _DECISION_COLOR.get(new_decision, "")
             delta = _colored("CHANGED", _ANSI_RED)
-            cmd_display = command[:60] if command else " ".join(tokens)[:60]
             print(f"{total:<5} {_cpad(old_effective, old_c, 12)} {_cpad(new_decision, new_c, 12)}"
-                  f" {delta:<18} {cmd_display}")
+                  f" {delta:<18}")
+            print(f"      cmd: {full_command}")
+            old_rule = result.get('rule_id')
+            old_reason = result.get('reason')
+            if old_rule:
+                print(f"      old: {old_rule}")
+            elif old_reason:
+                print(f"      old: {old_reason}")
+            if new_detail:
+                print(f"      new: {new_detail}")
+            print()
 
     print(sep)
     print(f"\nTotal: {total}  Unchanged: {unchanged}  "
           f"{_colored(f'Changed: {changed}', _ANSI_RED if changed else _ANSI_GREEN)}  "
           f"Skipped: {skipped}")
 
+    if malformed:
+        print(f"\n{_colored(f'{len(malformed)} malformed line(s):', _ANSI_YELLOW)}")
+        for ln, reason in malformed[:10]:
+            print(f"  line {ln}: {reason}")
+        if len(malformed) > 10:
+            print(f"  ... {len(malformed) - 10} more")
+
     if changed == 0:
         print(_colored(f"\n{_CHK} No outcome changes -- current config matches logged behavior.", _ANSI_GREEN))
     else:
         print(_colored(f"\n{_WARN} {changed} command(s) would produce different outcomes with current config.", _ANSI_YELLOW))
         print("  Run --audit \"<command>\" on specific commands to investigate.")
+
+
+def _rule_brief(rule: Rule | ToolRule) -> str:
+    if isinstance(rule, ToolRule):
+        target = f" {rule.path_pattern}" if rule.path_pattern is not None else ""
+        return f"{rule.id} {rule.action.value} {rule.tool_name}{target}"
+    return f"{rule.id} {rule.action.value} {rule.normalized}"
 
 
 def _replay_evaluate(
@@ -1557,12 +2073,12 @@ def _replay_evaluate(
     index: dict[str, list[int]],
     tool_rules: list[ToolRule],
     permission_mode: str,
-) -> str:
-    """Re-evaluate a single logged command against current rules. Returns final decision."""
+) -> tuple[str, Optional[str]]:
+    """Re-evaluate a single logged command against current rules."""
     if not tokens and command:
-        tokens = command.lower().split()
+        tokens = strip_heredoc_bodies(command).lower().split()
     if not tokens:
-        return "defer"
+        return "defer", "empty command"
 
     # Detect tool entries: check if first token is a known tool from $-rules
     known_tools = {r.tool_name for r in tool_rules}  # already lowercased
@@ -1573,29 +2089,35 @@ def _replay_evaluate(
         target = " ".join(tokens[1:]) if len(tokens) > 1 else ""
         winner = evaluate_tool(tool_rules, tool_name, target, debug=False)
         if winner is None:
-            return "defer"
+            return "defer", "no matching tool rule"
         effective, _ = _effective_decision(winner.action.value, "PreToolUse", permission_mode)
-        return effective
+        return effective, _rule_brief(winner)
 
     # Bash command evaluation
     pipe_shell = _check_pipe_to_shell(tokens)
     if pipe_shell:
-        return "deny"
+        return "deny", f"pipe-to-shell: {pipe_shell}"
+
+    push_guard = _check_git_protected_mutation(tokens)
+    if push_guard:
+        guard_decision, guard_reason = push_guard
+        effective, _ = _effective_decision(guard_decision, "PreToolUse", permission_mode)
+        return effective, f"protected-branch: {guard_reason}"
 
     raw_winner = _raw_pass(tokens, bash_rules, index, debug=False)
     if raw_winner is not None:
         effective, _ = _effective_decision(raw_winner.action.value, "PreToolUse", permission_mode)
-        return effective
+        return effective, _rule_brief(raw_winner)
 
     cmd_str = command if command else " ".join(tokens)
     try:
         sub_commands = extract_commands(cmd_str)
     except ImportError:
-        return "deny"
+        return "deny", "tree-sitter missing"
 
     if not sub_commands:
         effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
-        return effective
+        return effective, "empty parse -> fallback ask"
 
     governing: Optional[Rule] = None
 
@@ -1611,7 +2133,7 @@ def _replay_evaluate(
 
         if winner is None:
             effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
-            return effective
+            return effective, f"no rule matched sub-command: {sub_tokens[0]}"
 
         if winner.action in (Action.DENY, Action.ASK, Action.REQUIRE_ASK):
             governing = winner
@@ -1622,10 +2144,10 @@ def _replay_evaluate(
 
     if governing is None:
         effective, _ = _effective_decision("ask", "PreToolUse", permission_mode)
-        return effective
+        return effective, "no governing rule"
 
     effective, _ = _effective_decision(governing.action.value, "PreToolUse", permission_mode)
-    return effective
+    return effective, _rule_brief(governing)
 
 
 # ---------------------------------------------------------------------------
@@ -1702,7 +2224,8 @@ def _handle_bash(
         return
 
     command = normalize(raw_command)
-    raw_tokens = command.lower().split()
+    precheck_command = strip_heredoc_bodies(command)
+    raw_tokens = precheck_command.lower().split()
 
     # --- Pre-check 1: pipe-to-shell (hardcoded, covers trailing-arg variants) ---
     pipe_shell = _check_pipe_to_shell(raw_tokens)
@@ -1727,7 +2250,30 @@ def _handle_bash(
         )
         return
 
-    # --- Pre-check 2: raw pass — catches compound deny rules (redirects, etc.) ---
+    # --- Pre-check 2: protected branch mutation guard ---
+    push_guard = _check_git_protected_mutation(raw_tokens, debug=debug)
+    if push_guard:
+        guard_decision, guard_reason = push_guard
+        effective_decision, reason_override = _effective_decision(guard_decision, event, permission_mode)
+        reason = reason_override or guard_reason
+        output = _emit(effective_decision, reason, event)
+        log_decision(
+            event=event,
+            raw_input=payload,
+            normalized_command=command,
+            normalized_tokens=raw_tokens,
+            decision=effective_decision,
+            source="default",
+            rule_id=None,
+            reason="protected branch mutation",
+            rules_evaluated=0,
+            rules_matched=0,
+            evaluations=[],
+            output_payload=output,
+        )
+        return
+
+    # --- Pre-check 3: raw pass — catches compound deny rules (redirects, etc.) ---
     raw_winner = _raw_pass(raw_tokens, bash_rules, index, debug)
     if raw_winner is not None:
         decision, reason_override = _effective_decision(raw_winner.action.value, event, permission_mode)
@@ -1910,17 +2456,22 @@ def main() -> None:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--verify", action="store_true")
-    parser.add_argument("--usage", action="store_true")
+    parser.add_argument("--usage", nargs="?", const=1, type=int, default=None,
+                        help="Rule hit counts from logs (default: last 1 day, or --usage N for N days)")
     parser.add_argument("--audit", type=str, default=None,
                         help='Trace a command: --audit "git push origin main"')
-    parser.add_argument("--replay", type=str, default=None,
-                        help="Replay a day's log: --replay 03-23-2026")
+    parser.add_argument("--replay", nargs="?", const="today", type=str, default=None,
+                        help="Replay a day's log (default: today, or --replay MM-DD-YYYY)")
+    parser.add_argument("--search", type=str, default=None,
+                        help='Filter replay output by case-insensitive comma-separated command terms, e.g. --search "git,gh"')
     parser.add_argument("--mode", type=str, default="default",
                         help="Permission mode for --audit/--replay (default, dontAsk, bypassPermissions)")
     parser.add_argument("--no-color", action="store_true",
                         help="Disable ANSI color codes in output (auto-set when stdout is not a tty)")
     parser.add_argument("--compact", action="store_true",
                         help="Compact audit output: one line per sub-command showing only the governing rule")
+    parser.add_argument("-q", "--quiet", action="store_true",
+                        help="Minimal audit output: '<command> --> <decision>' and governing rule")
     args, _ = parser.parse_known_args()
 
     if args.no_color:
@@ -1931,16 +2482,16 @@ def main() -> None:
         cmd_verify()
         return
 
-    if args.usage:
-        cmd_usage()
+    if args.usage is not None:
+        cmd_usage(days=args.usage)
         return
 
     if args.audit is not None:
-        cmd_audit(args.audit, permission_mode=args.mode, compact=args.compact)
+        cmd_audit(args.audit, permission_mode=args.mode, compact=args.compact, quiet=args.quiet)
         return
 
     if args.replay is not None:
-        cmd_replay(args.replay, permission_mode=args.mode)
+        cmd_replay(args.replay, permission_mode=args.mode, search=args.search)
         return
 
     raw_input = sys.stdin.read()
