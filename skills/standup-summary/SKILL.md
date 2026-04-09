@@ -33,6 +33,17 @@ usePwsh7 Git-DailySummary
 
 Capture the full output. Note the date it reports (top of output).
 
+Also include commits made to `wrench-dna` today — this repo tracks tooling,
+skills, agent config, and context files. Query it with:
+
+```
+git -C C:\Users\willem\Documents\WrenchProjects\wrench-dna log --oneline --author=Kydoimos97 --after="[TODAY] 00:00" --before="[TODAY+1] 00:00" --format="%ad %h %s" --date=short
+```
+
+Summarise any wrench-dna commits in the **Other** section unless they are
+substantial enough (e.g. a major restructure or new skill suite) to warrant
+a mention in **Main Points**.
+
 ### Step 2 — Deep-read a sample of PRs
 
 From the PRs Opened Today list, select up to 6 PRs that look most
@@ -111,7 +122,7 @@ WrenchAI/repo-name:
 Target path:
 
 ```
-C:\Users\willem\Documents\WrenchProjects\Notes\Standups\YYYY-MM-DD-work-summary.md
+C:\Users\willem\Documents\WrenchProjects\wrench-dna\people\willem\journal\YYYY-MM-DD-work-summary.md
 ```
 
 Where `YYYY-MM-DD` is **today's** date (the day being summarised, not tomorrow).
@@ -131,6 +142,36 @@ Before writing, use the Read tool to check whether the file already exists.
   - URLs section → add any missing entries; do not remove existing ones.
 
 Confirm the file path and whether it was created or updated to the user after writing.
+
+### Step 5b — Commit and PR the journal file
+
+The journal directory lives inside the `wrench-dna` repo. All changes must reach main via PR — never commit directly to main.
+
+After writing the file:
+
+1. Create a branch:
+   ```
+   git -C C:\Users\willem\Documents\WrenchProjects\wrench-dna checkout -b people/willem/standup-YYYY-MM-DD
+   ```
+
+2. Stage and commit:
+   ```
+   git -C C:\Users\willem\Documents\WrenchProjects\wrench-dna add people/willem/journal/YYYY-MM-DD-work-summary.md
+   git -C C:\Users\willem\Documents\WrenchProjects\wrench-dna commit -m "docs: standup summary for YYYY-MM-DD"
+   ```
+
+3. Push and open a PR:
+   ```
+   git -C C:\Users\willem\Documents\WrenchProjects\wrench-dna push -u origin people/willem/standup-YYYY-MM-DD
+   gh pr create --repo WrenchAI/wrench-dna --title "docs: standup YYYY-MM-DD" --body "Daily standup summary. No end-user impact."
+   ```
+
+4. Merge the PR immediately using `--admin` if branch protection blocks it:
+   ```
+   gh pr merge <NUMBER> --repo WrenchAI/wrench-dna --admin --merge
+   ```
+
+Report the PR URL and merge status to the user.
 
 ### Step 6 — Write the Evaluation section
 
