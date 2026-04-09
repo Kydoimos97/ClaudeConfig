@@ -43,7 +43,6 @@ pip install plyer            # Linux/macOS
         ├── commands.conf              # unified permission policy (source of truth)
         ├── commands.json              # compiled rule cache (auto-generated)
         ├── base_hooks.json            # default hook event config
-        ├── beebop_hooks.json          # beebop-specific event overrides
         └── *.png                      # notification icons
 ```
 
@@ -166,8 +165,6 @@ Reads `agent_type` from the hook payload and loads `resources/{agent_type}_hooks
 
 Supported event names: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, `PostToolUse`, `PostToolUseFailure`, `SubagentStart`, `SubagentStop`, `Elicitation`, `ElicitationResult`, `TaskCompleted`, `Stop`, `SessionEnd`.
 
-Currently active: in Beebop sessions `PreToolUse` injects `"BEEBOP GUARD: Are you sure this should not be delegated to Kiro or codex?"` before every tool call.
-
 ### claude-notify (Stop / PermissionRequest / Elicitation / Notification)
 
 Shows a desktop toast notification. Called by the `.sh` wrapper with:
@@ -221,7 +218,7 @@ $[~] WebFetch https://**            # ask before any web fetch
 
 ### Agent-specific hook instructions
 
-Create `resources/{agent_name}_hooks.json` modelled on `beebop_hooks.json`. The file maps event names to `{ "instruction": "text" }`. Set to `null` to disable an event.
+Create `resources/{agent_name}_hooks.json` for any agent-specific overrides. The file maps event names to `{ "instruction": "text" }`. Set to `null` to disable an event.
 
 ```json
 {

@@ -1,28 +1,46 @@
 ---
 name: codex
 description: >
-  Use codex exec for code implementation and code review only. Codex does not
-  run project tooling (tests, uv, task) — main runs those directly. For
-  research, reads, and web search use Kiro instead.
+  Use codex exec for large multi-file implementation (5+ files) and code
+  review. Escalation from Worker when task scope exceeds 1-3 files. Codex
+  cannot run project tooling — Worker handles tests and builds.
 ---
 
 # Codex
 
-Codex runs in a Windows sandbox with write access to the workspace. It has no
-outbound network access and no uv/pytest invocation capability — that is why
-implementation and review are its only jobs. For research, reads, or triage,
-use Kiro instead.
+Codex runs in a Windows sandbox with workspace write access. Use it when a
+task genuinely needs broad file context — typically 5+ files or a cross-cutting
+refactor. **Default to Worker for anything under 5 files.**
 
-## Sandbox modes
+No outbound network. No uv/pytest. Implementation and review only.
+
+## When to Use Codex Over Worker
+
+- Multi-file refactors touching 5+ files
+- Large feature where full file context across modules matters
+- Changes requiring reading many files to understand dependencies
+- When Worker would need 4+ sequential invocations for one logical change
+
+## When to Use Worker Instead
+
+- Single-file changes
+- Mechanical fixes (lint, types, formatting)
+- Test writing for a specific module
+- Small bug fixes with clear scope
+- Anything touching 1-3 files
+
+## Sandbox Modes
 
 | Mode | Flag | Use for |
 |------|------|---------|
-| Review | `--sandbox read-only` | Reviewing diffs — no execution needed |
-| Implement | `--sandbox workspace-write` | Writing and editing files |
+| Review | `--sandbox read-only` | Reviewing diffs |
+| Implement | `--sandbox workspace-write` | Writing/editing files |
 
-## Review mode
+## Review Mode
 
-Use for: reviewing diffs, finding bugs, checking edge cases, validating refactor safety.
+Codex has full filesystem read access in the sandbox. Pass file paths in the
+prompt — do NOT inline file content as shell arguments. Large diffs or files
+passed via `$(cat ...)` will hit the OS argument length limit and fail.
 
 ```bash
 git diff HEAD > /tmp/codex-review-diff.patch
@@ -30,51 +48,20 @@ git diff HEAD > /tmp/codex-review-diff.patch
 codex exec \
   --sandbox read-only \
   --output-last-message /tmp/codex-review-output.txt \
-  "Review the following code changes. Focus on:
+  "Review the diff at /tmp/codex-review-diff.patch. Focus on:
 1. Bugs and logic errors (P0)
 2. Security vulnerabilities (P0)
 3. Unhandled edge cases (P1)
 4. Performance issues when material (P1)
 
-Skip style nits, formatting, and naming preferences.
+Skip style nits, formatting, naming preferences.
 
-For each finding: file, line range, priority (P0/P1), description.
-
-$(cat /tmp/codex-review-diff.patch)"
+For each finding: file, line range, priority (P0/P1), description."
 ```
 
-If no staged or unstaged changes exist, stop — nothing to review.
+Clean up: `rm /tmp/codex-review-diff.patch /tmp/codex-review-output.txt`
 
-Triage findings:
-- Agree: valid bug, security issue, or logic error
-- Disagree: Codex misunderstands context — note reason
-- Style nit: skip
-
-Clean up after reading:
-
-```bash
-rm /tmp/codex-review-diff.patch /tmp/codex-review-output.txt
-```
-
-Output contract:
-
-## Codex Review Report
-Summary: X agreed (Y P0, Z P1), N disagreed, M style nits skipped
-
-### Agreed Findings
-1. [P0] file:line — description
-
-### Disagreed Findings
-1. [P1] file:line — reason skipped
-
-### Commands fired
-<count>
-
----
-
-## Implement mode
-
-Use for: feature implementation, bug fixes, refactoring, patch generation, test updates.
+## Implement Mode
 
 ```bash
 codex exec \
@@ -83,70 +70,27 @@ codex exec \
   "<fully scoped implementation prompt>"
 ```
 
-Prompt must include: exact goal, scope boundaries, explicit exclusions, required output format.
+Prompt must include: exact goal, scope boundaries, explicit exclusions,
+required output format. Same structure as Worker prompts (Goal, Scope,
+Approach, Constraints) but broader scope.
 
-Always pass a timeout to the Bash tool — Codex can loop indefinitely on large
-tasks. Recommended: `timeout: 180000` (3 minutes) for small patches,
-`timeout: 300000` (5 minutes) for multi-file implementation. If the command
-times out, check `/tmp/codex-implement-output.txt` for partial output before
-deciding whether to retry or split the task.
-
-Output contract:
-
-## Implementation Summary
-- change
-
-## Files affected
-- path
-
-## Commands fired
-<count>
-
-## Concerns
-<omit if none>
-
----
+Always pass a timeout: `timeout: 180000` (3 min) for small patches,
+`timeout: 300000` (5 min) for multi-file work.
 
 ## Rules
 
-- Review mode: `--sandbox read-only` always
-- Implement mode: `--sandbox workspace-write` always
+- Review: `--sandbox read-only` always
+- Implement: `--sandbox workspace-write` always
 - One Codex pass only — no iteration loop
 - Prompts must be fully self-contained
-- Always use `--output-last-message` and read the file after — do not rely on stdout
-- If Codex fails, report clearly and stop — do not retry silently or widen permissions
-- After 3 failed attempts on the same goal, stop and surface to main with what was tried
-
-## Before invoking
-
-Main must have already completed research and made all design decisions before
-invoking Codex. The task handed off is fully specified — exact goal, scope,
-files affected, and approach already decided. Codex implements or reviews;
-it does not design.
-
-Validate before running:
-- Is the scope clearly bounded?
-- Are the target files and change clearly defined?
-- Is Codex the right tool, or can main handle this directly?
+- Always use `--output-last-message` and read the file after
+- After 3 failed attempts on same goal, stop and surface to Conductor
 
 ## Verification
 
-Codex is an external tool running a different model with different context.
-Its output is volatile — treat all results as input to main's judgment,
-not as ground truth. Always verify before accepting:
-- Read every changed file before marking the task done
-- Cross-check implementation against the original intent
-- Flag anything unexpected or outside the requested scope
-- Never apply Codex output blindly
-
-## Second opinion
-
-Codex can be invoked for a second opinion on a design decision or implementation
-approach. Because it runs independently with no shared context, its view is
-genuinely alternative. Useful for:
-- Validating an implementation plan before executing it
-- Checking whether a proposed code structure has obvious issues
-- Getting an independent read on a technical tradeoff
-
-Frame the question clearly with all relevant context embedded.
-Treat the response as one input among several, not a final verdict.
+Codex runs a different model with different context. Treat all output as
+input to Conductor's judgment:
+- Read every changed file before committing (use line ranges for large files)
+- Cross-check against original intent
+- Flag anything outside requested scope
+- Have Worker run tests after Codex implements

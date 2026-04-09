@@ -1,6 +1,6 @@
 {
-  "SessionStart":      { "instruction": null },
-  "UserPromptSubmit":  { "instruction": null },
+  "SessionStart":      { "instruction": "Check for AgentMemory.md in the current working directory. If it does not exist, create it now using the standard template (Todo / Global Notes / Additional Guidance / Memories sections). Read it fully before doing anything else." },
+  "UserPromptSubmit":  { "instruction": "Remember the skills available to you. Manage your tokens and delegate 'dumb' coding tasks to codex and 'dumb' research tasks to kiro when you can." },
   "PreToolUse":        { "instruction": null },
   "PermissionRequest": { "instruction": null },
   "PostToolUse":       { "instruction": null },
@@ -9,7 +9,7 @@
   "SubagentStop":      { "instruction": null },
   "Elicitation":       { "instruction": null },
   "ElicitationResult": { "instruction": null },
-  "TaskCompleted":     { "instruction": null },
-  "Stop":              { "instruction": null },
-  "SessionEnd":        { "instruction": null }
+  "TaskCompleted":     { "instruction": "Remember AgentMemory.md — check off completed todos, and append any new memories, user guidance, or notes worth preserving. Keep entries lean: only write what a future session would genuinely need after compaction." },
+  "Stop":              { "instruction": "Before stopping, update AgentMemory.md — check off completed todos, and append any new memories, user guidance, or notes worth preserving. Keep entries lean: only write what a future session would genuinely need after compaction." },
+  "SessionEnd":        { "instruction": "Before the session ends: 1. Slack — always post to channel C0APNMPDUJ3 with a short idle notice in the format '[Repo - Branch] - Agent Idle' followed by one-liner bullet points of todos ticked off in AgentMemory.md this session, no other details. 2. Notion — review what was done this session, draft specific proposed updates (pages to create or fields to change), and ask the user to confirm before applying. 3. Wrench-DNA — review what was done this session, draft specific proposed changes (files to add or update, with a one-line summary of each), and ask the user to confirm before committing. 4. AgentMemory.md — always update regardless." }
 }

@@ -50,11 +50,11 @@ verbatim; synthesise it into one tight sentence per PR.
 
 ### Step 3 — Check for non-git context
 
-If the user's message included non-git items (subscriptions, Datadog
-connectors, tool configs, meetings, decisions, etc.) — incorporate them
-directly into the Other section.
+If the user's message or this session's `AgentMemory.md` included non-git items
+(subscriptions, Datadog connectors, tool configs, meetings, decisions, etc.) —
+incorporate them directly into the Other section.
 
-If the user did NOT mention any non-git items, ask exactly this before
+If neither the user nor `AgentMemory.md` provides any non-git items, ask exactly this before
 proceeding:
 
 > "Did you do anything today outside of GitHub — subscriptions, tool
