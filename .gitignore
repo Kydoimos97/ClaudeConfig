@@ -25,3 +25,8 @@ image-cache/
 
 .claude/
 plugins/
+setting_backups/
+hooks/__pycache__/
+audit-commands.txt
+context_analysis.txt
+statusline-debug.json
