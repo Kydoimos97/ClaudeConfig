@@ -119,6 +119,17 @@
           }
         ]
       }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'cat >> $HOME/.claude/failed_commands.md'"
+          }
+        ]
+      }
     ]
   },
   "statusLine": {

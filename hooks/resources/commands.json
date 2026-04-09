@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "compiled_at": "2026-04-08T19:33:53.062139",
+  "compiled_at": "2026-04-09T02:41:45.244768",
   "source": {
     "path": "C:\\Users\\willem\\.claude\\hooks\\resources\\commands.conf",
-    "mtime": 1775698432.694492,
-    "hash": "sha256:29d9d833039c91a4a41d7bc136d7324393e0b35cdee1df222ee24e9dcaeb5d32"
+    "mtime": 1775724080.8189957,
+    "hash": "sha256:e798d34d6340b9ec4467d0920de9c0c9774c24c6875e494d4313ce41c1ed2941"
   },
   "rules": [
     {

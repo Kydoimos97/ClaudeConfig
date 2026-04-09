@@ -1,73 +1,59 @@
 ---
 name: session-memory
 description: >
-  AgentMemory.md format, update rules, and session lifecycle. Read at
-  session start to restore context and establish the memory file.
+  Native Claude Code project memory format, update rules, and topic file
+  structure. Read at session start to restore context.
 ---
 
 # Session Memory
 
-`AgentMemory.md` in the project root is your canonical memory across sessions
-and compactions. Read it at session start. Update it continuously.
+Claude Code automatically injects project memory into every session via
+system-reminder. The files live at:
+
+```
+~/.claude/projects/<encoded-project-path>/memory/
+  MEMORY.md          <- index, quick facts, topic file list
+  active-prs.md      <- open branches, PR numbers, status
+  cypress-baseline.md
+  api-migration.md
+  component-contracts.md
+  auth-session.md
+  codebase-patterns.md
+  ... (add topic files as needed)
+```
+
+The `<encoded-project-path>` is the CWD with `\` → `--` and `:` dropped.
+Example: `C:\Users\willem\Documents\WrenchProjects\wrench-frontend`
+→ `C--Users-willem-Documents-WrenchProjects-wrench-frontend`
 
 ## Bootstrap
 
-1. Check for `AgentMemory.md` in the working directory
-2. If missing, create it with the template below
-3. Read it fully to restore context
-4. Proceed with the session
-
-## Template
-
-```markdown
-## Todo
-- [ ] item
-- [x] completed item
-
----
-
-## Global Notes
-[YYYY-MM-DD HH:MM] Observation about project or architecture.
-
----
-
-## Additional Guidance
-[YYYY-MM-DD HH:MM] User said: explicit instruction to follow in this repo.
-
----
-
-## Memories
-[YYYY-MM-DD HH:MM] Tried X — failed because Y. Switched to Z.
-```
+1. Claude Code injects memory into context automatically — no manual read needed
+2. If a topic file is referenced in MEMORY.md but missing, create it
+3. Do NOT create or look for `AgentMemory.md` — that system is retired
 
 ## Update Rules
 
-- **Always append, never replace** existing entries
-- New entries prepend above older ones within each section
-- Completed todos: check off (`[x]`), prune after two sessions
-- **Additional Guidance** = permanent standing rules for this repo
-- **Memories** = what was tried, what worked, what failed
-- **Global Notes** = architecture observations, patterns found
-- Include in commits when updated — it is a tracked project file
-- Keep it lean — only what a fresh session genuinely needs
+- **MEMORY.md** — index only; update quick facts and topic file list here
+- **Topic files** — append to the relevant file; never replace existing entries
+- Keep entries lean — only what a fresh session genuinely needs
+- Write when something materially changes: user instruction, approach failure,
+  non-obvious decision, architecture insight, task completed/added
+- Do NOT write routine progress or things already in commit messages
 
-## What to Write
+## What Goes Where
 
-Write when something materially changes, not on a timer:
-- User gives an explicit instruction → Additional Guidance
-- An approach fails → Memories (include why it failed)
-- A non-obvious decision is made → Memories
-- Architecture insight discovered → Global Notes
-- Task completed or added → Todo
-
-## What NOT to Write
-
-- Routine progress ("ran tests, they passed")
-- Things already captured in commit messages
-- Temporary state that won't matter after a restart
+| Content | File |
+|---------|------|
+| Open PRs, branch status | `active-prs.md` |
+| Cypress spec inventory, runner notes, lessons | `cypress-baseline.md` |
+| API endpoint migration history | `api-migration.md` |
+| testId patterns, e2e metadata contracts | `component-contracts.md` |
+| WorkOS auth, cy.session patterns | `auth-session.md` |
+| Routing, slice/hook conventions, feature flags | `codebase-patterns.md` |
+| Quick facts about the project | `MEMORY.md` Quick Facts section |
 
 ## Merge Conflicts
 
-When conflicts occur on `AgentMemory.md`, consolidate both sides:
-deduplicate, merge overlapping entries, leave the file leaner than
-either branch had it.
+When conflicts occur on memory files, consolidate both sides: deduplicate,
+merge overlapping entries, leave the file leaner than either branch had it.

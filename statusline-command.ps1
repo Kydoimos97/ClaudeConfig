@@ -22,9 +22,10 @@ function fmt-duration([long]$totalSecs) {
     return "${totalSecs}s"
 }
 
-function fmt-osc8([string]$text, [string]$url) {
+function fmt-osc8([string]$text, [string]$url, [string]$color = '') {
     $bell = [char]7
-    return "${ESC}]8;;${url}${bell}${text}${ESC}]8;;${bell}"
+    $inner = if ($color) { "${color}${text}${R}" } else { $text }
+    return "${ESC}]8;;${url}${bell}${inner}${ESC}]8;;${bell}"
 }
 
 $PIPE = " ${GR}|${R} "
@@ -131,13 +132,13 @@ try {
 
     if ($repoNameSource) {
         $repoLeaf = Split-Path $repoNameSource -Leaf
-        $repoText = if ($remoteUrl) { fmt-osc8 $repoLeaf $remoteUrl } else { $repoLeaf }
-        $repoStr = "${CY}${repoText}${R}"
+        $repoText = if ($remoteUrl) { fmt-osc8 $repoLeaf $remoteUrl $CY } else { "${CY}${repoLeaf}${R}" }
+        $repoStr = $repoText
     }
     if ($branch) {
         $branchUrl  = if ($remoteUrl) { "$remoteUrl/tree/$branch" } else { $null }
-        $branchText = if ($branchUrl) { fmt-osc8 $branch $branchUrl } else { $branch }
-        $repoStr += "${GR}(${R}${MG}${branchText}${R}${GR})${R}"
+        $branchText = if ($branchUrl) { fmt-osc8 $branch $branchUrl $MG } else { "${MG}${branch}${R}" }
+        $repoStr += "${GR}(${R}${branchText}${GR})${R}"
     }
     if ($repoStr) { $s2parts.Add($repoStr) }
 

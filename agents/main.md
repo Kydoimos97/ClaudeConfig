@@ -136,7 +136,7 @@ Read each one once at session start or when you first need it.
 
 | Skill | What it holds | When to read |
 |-------|--------------|--------------|
-| `session-memory` | AgentMemory.md format, update rules, lifecycle | Session start |
+| `session-memory` | Native Claude Code memory format, update rules, topic file structure | Session start |
 | `tooling-reference` | PowerShell commands, DB access, AWS secrets, c-guard, knowledge sources | First time you need tooling or project context |
 | `behavioral-reference` | Quality gate details, commit discipline, branch rules, PR conventions, output format | First time you write a commit or PR |
 | `kiro` | CLI invocation, task types, output contracts | First Kiro invocation |
