@@ -982,7 +982,12 @@ _GIT_BRANCH_MUTATORS: frozenset[str] = frozenset([
 
 
 def _is_protected_branch(branch: str) -> bool:
-    """Check if a branch name matches any entry in PROTECTED_BRANCHES."""
+    """Check if a branch name matches any entry in PROTECTED_BRANCHES.
+
+    Fallback heuristic when no explicit rule matches:
+      - Branch contains '/' (e.g. feat/foo, fix/bar) → not protected
+      - Branch without '/' (e.g. main, develop, qa)  → protected
+    """
     lower = branch.lower()
     for pattern in PROTECTED_BRANCHES:
         if "*" in pattern or "?" in pattern:
@@ -990,7 +995,7 @@ def _is_protected_branch(branch: str) -> bool:
                 return True
         elif lower == pattern:
             return True
-    return False
+    return "/" not in lower
 
 
 def _git_current_branch() -> Optional[str]:
@@ -1074,6 +1079,7 @@ def _extract_push_target(tokens: list[str]) -> Optional[str]:
 def _check_git_protected_mutation(
     tokens: list[str],
     debug: bool = False,
+    mock_pr_base: Optional[str] = None,
 ) -> Optional[tuple[str, str]]:
     """Detect git/gh operations that would mutate a protected branch.
 
@@ -1135,7 +1141,7 @@ def _check_git_protected_mutation(
     # --- gh CLI checks ---
     if lower[:3] == ["gh", "pr", "merge"]:
         pr_number = next((t for t in lower if t.isdigit()), None)
-        base = _gh_pr_base_branch(pr_number) if pr_number else None
+        base = mock_pr_base if mock_pr_base is not None else (_gh_pr_base_branch(pr_number) if pr_number else None)
         if debug:
             print(
                 f"[debug] git-protect: gh pr merge pr={pr_number} base={base}",
@@ -1669,6 +1675,7 @@ def cmd_audit(
     permission_mode: str = "default",
     compact: bool = False,
     quiet: bool = False,
+    target: Optional[str] = None,
 ) -> None:
     """Trace a command through the full evaluation pipeline, showing every rule."""
     bash_rules, index, tool_rules = load_policy(CONF_PATH, JSON_PATH)
@@ -1705,7 +1712,7 @@ def cmd_audit(
     # --- Phase 1b: protected branch mutation check ---
     if not compact and not quiet:
         print(_colored(f"\n{_RULE_SEP} Phase 1b: protected branch guard {_RULE_SEP}", _ANSI_DIM))
-    push_guard = _check_git_protected_mutation(raw_tokens)
+    push_guard = _check_git_protected_mutation(raw_tokens, mock_pr_base=target)
     if push_guard:
         guard_decision, guard_reason = push_guard
         if quiet:
@@ -1798,6 +1805,22 @@ def cmd_audit(
             continue
         if all(t.strip("\\") == "" for t in tokens):
             continue
+
+        sub_guard = _check_git_protected_mutation(tokens, mock_pr_base=target)
+        if sub_guard:
+            guard_decision, guard_reason = sub_guard
+            if quiet:
+                effective, _ = _effective_decision(guard_decision, "PreToolUse", permission_mode)
+                _emit_quiet_audit(command, effective, f"protected-branch (sub-cmd): {guard_reason}")
+                return
+            if not compact and not quiet:
+                print(f"\n  {_colored(_RARR + ' ' + cmd_text, _ANSI_BOLD)}")
+                c = _DECISION_COLOR.get(guard_decision, "")
+                print(f"    {_colored('BLOCKED', c)}  protected-branch: {guard_reason}")
+            effective, _ = _effective_decision(guard_decision, "PreToolUse", permission_mode)
+            print(f"\n{_colored('Final:', _ANSI_BOLD)}  {_colored(effective, _DECISION_COLOR.get(effective, ''))}"
+                  f"  (protected-branch in sub-command: {cmd_text[:60]})")
+            return
 
         if not compact and not quiet:
             print(f"\n  {_colored(_RARR + ' ' + cmd_text, _ANSI_BOLD)}")
@@ -2128,6 +2151,12 @@ def _replay_evaluate(
             continue
         if all(t.strip("\\") == "" for t in sub_tokens):
             continue
+
+        sub_guard = _check_git_protected_mutation(sub_tokens)
+        if sub_guard:
+            guard_decision, guard_reason = sub_guard
+            effective, _ = _effective_decision(guard_decision, "PreToolUse", permission_mode)
+            return effective, f"protected-branch: {guard_reason}"
 
         winner, _, _, _ = evaluate_bash(bash_rules, index, sub_tokens, debug=False)
 
@@ -2460,6 +2489,8 @@ def main() -> None:
                         help="Rule hit counts from logs (default: last 1 day, or --usage N for N days)")
     parser.add_argument("--audit", type=str, default=None,
                         help='Trace a command: --audit "git push origin main"')
+    parser.add_argument("--target", type=str, default=None,
+                        help="Mock PR base branch for --audit of gh pr merge (skips live gh pr view lookup)")
     parser.add_argument("--replay", nargs="?", const="today", type=str, default=None,
                         help="Replay a day's log (default: today, or --replay MM-DD-YYYY)")
     parser.add_argument("--search", type=str, default=None,
@@ -2487,7 +2518,7 @@ def main() -> None:
         return
 
     if args.audit is not None:
-        cmd_audit(args.audit, permission_mode=args.mode, compact=args.compact, quiet=args.quiet)
+        cmd_audit(args.audit, permission_mode=args.mode, compact=args.compact, quiet=args.quiet, target=args.target)
         return
 
     if args.replay is not None:
