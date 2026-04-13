@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "compiled_at": "2026-04-09T02:41:45.244768",
+  "compiled_at": "2026-04-11T19:27:55.805601",
   "source": {
     "path": "C:\\Users\\willem\\.claude\\hooks\\resources\\commands.conf",
-    "mtime": 1775724080.8189957,
-    "hash": "sha256:e798d34d6340b9ec4467d0920de9c0c9774c24c6875e494d4313ce41c1ed2941"
+    "mtime": 1775957258.8995478,
+    "hash": "sha256:4c9611a61ad147a4add8ddd18cca41b3dbfa85756525a1e0ea69b4e3e38b1b39"
   },
   "rules": [
     {
@@ -9226,6 +9226,31 @@
     {
       "id": "rule_469",
       "line": 469,
+      "raw": "[+] read ** #Approved: shell builtin for reading input in while-read loops",
+      "normalized": "read **",
+      "action": "allow",
+      "tokens": [
+        {
+          "type": "literal",
+          "value": "read"
+        },
+        {
+          "type": "wildcard_multi"
+        }
+      ],
+      "specificity": {
+        "literal_count": 1,
+        "weight_vector": [
+          "literal",
+          "multi_wildcard"
+        ],
+        "content_score": 10
+      },
+      "hint": "Approved: shell builtin for reading input in while-read loops"
+    },
+    {
+      "id": "rule_470",
+      "line": 470,
       "raw": "[+] diff **",
       "normalized": "diff **",
       "action": "allow",
@@ -9248,8 +9273,8 @@
       }
     },
     {
-      "id": "rule_470",
-      "line": 470,
+      "id": "rule_471",
+      "line": 471,
       "raw": "[+] tr **",
       "normalized": "tr **",
       "action": "allow",
@@ -9272,8 +9297,8 @@
       }
     },
     {
-      "id": "rule_471",
-      "line": 471,
+      "id": "rule_472",
+      "line": 472,
       "raw": "[+] column **",
       "normalized": "column **",
       "action": "allow",
@@ -9296,8 +9321,8 @@
       }
     },
     {
-      "id": "rule_472",
-      "line": 472,
+      "id": "rule_473",
+      "line": 473,
       "raw": "[+] touch ** #Approved: creating or updating file timestamp",
       "normalized": "touch **",
       "action": "allow",
@@ -9321,8 +9346,8 @@
       "hint": "Approved: creating or updating file timestamp"
     },
     {
-      "id": "rule_473",
-      "line": 473,
+      "id": "rule_474",
+      "line": 474,
       "raw": "[+] basename **",
       "normalized": "basename **",
       "action": "allow",
@@ -9345,8 +9370,8 @@
       }
     },
     {
-      "id": "rule_474",
-      "line": 474,
+      "id": "rule_475",
+      "line": 475,
       "raw": "[+] dirname **",
       "normalized": "dirname **",
       "action": "allow",
@@ -9369,8 +9394,8 @@
       }
     },
     {
-      "id": "rule_475",
-      "line": 475,
+      "id": "rule_476",
+      "line": 476,
       "raw": "[+] realpath **",
       "normalized": "realpath **",
       "action": "allow",
@@ -9393,8 +9418,8 @@
       }
     },
     {
-      "id": "rule_476",
-      "line": 476,
+      "id": "rule_477",
+      "line": 477,
       "raw": "[+] readlink **",
       "normalized": "readlink **",
       "action": "allow",
@@ -9417,8 +9442,8 @@
       }
     },
     {
-      "id": "rule_477",
-      "line": 477,
+      "id": "rule_478",
+      "line": 478,
       "raw": "[+] open **",
       "normalized": "open **",
       "action": "allow",
@@ -9441,8 +9466,8 @@
       }
     },
     {
-      "id": "rule_478",
-      "line": 478,
+      "id": "rule_479",
+      "line": 479,
       "raw": "[+] cp ** #Approved: copying files",
       "normalized": "cp **",
       "action": "allow",
@@ -9466,8 +9491,8 @@
       "hint": "Approved: copying files"
     },
     {
-      "id": "rule_479",
-      "line": 479,
+      "id": "rule_480",
+      "line": 480,
       "raw": "[+] mv ** #Approved: moving files",
       "normalized": "mv **",
       "action": "allow",
@@ -9491,8 +9516,8 @@
       "hint": "Approved: moving files"
     },
     {
-      "id": "rule_480",
-      "line": 480,
+      "id": "rule_481",
+      "line": 481,
       "raw": "[+] mkdir ** #Approved: creating directory",
       "normalized": "mkdir **",
       "action": "allow",
@@ -9516,8 +9541,8 @@
       "hint": "Approved: creating directory"
     },
     {
-      "id": "rule_481",
-      "line": 481,
+      "id": "rule_482",
+      "line": 482,
       "raw": "[~] chmod ** +x * #Making file executable \u2014 confirm",
       "normalized": "chmod ** +x *",
       "action": "ask",
@@ -9550,8 +9575,8 @@
       "hint": "Making file executable \u2014 confirm"
     },
     {
-      "id": "rule_482",
-      "line": 482,
+      "id": "rule_483",
+      "line": 483,
       "raw": "[+] netstat **",
       "normalized": "netstat **",
       "action": "allow",
@@ -9574,8 +9599,8 @@
       }
     },
     {
-      "id": "rule_483",
-      "line": 483,
+      "id": "rule_484",
+      "line": 484,
       "raw": "[+] node **",
       "normalized": "node **",
       "action": "allow",
@@ -9598,8 +9623,8 @@
       }
     },
     {
-      "id": "rule_484",
-      "line": 484,
+      "id": "rule_485",
+      "line": 485,
       "raw": "[+] timeout **",
       "normalized": "timeout **",
       "action": "allow",
@@ -9622,8 +9647,8 @@
       }
     },
     {
-      "id": "rule_485",
-      "line": 485,
+      "id": "rule_486",
+      "line": 486,
       "raw": "[+] kill **",
       "normalized": "kill **",
       "action": "allow",
@@ -9646,8 +9671,8 @@
       }
     },
     {
-      "id": "rule_486",
-      "line": 486,
+      "id": "rule_487",
+      "line": 487,
       "raw": "[+] strings **",
       "normalized": "strings **",
       "action": "allow",
@@ -9670,8 +9695,8 @@
       }
     },
     {
-      "id": "rule_487",
-      "line": 487,
+      "id": "rule_488",
+      "line": 488,
       "raw": "[+] seq **",
       "normalized": "seq **",
       "action": "allow",
@@ -9694,8 +9719,8 @@
       }
     },
     {
-      "id": "rule_488",
-      "line": 488,
+      "id": "rule_489",
+      "line": 489,
       "raw": "[+] base64 **",
       "normalized": "base64 **",
       "action": "allow",
@@ -9718,8 +9743,8 @@
       }
     },
     {
-      "id": "rule_489",
-      "line": 489,
+      "id": "rule_490",
+      "line": 490,
       "raw": "[+] cygpath **",
       "normalized": "cygpath **",
       "action": "allow",
@@ -9742,8 +9767,8 @@
       }
     },
     {
-      "id": "rule_490",
-      "line": 490,
+      "id": "rule_491",
+      "line": 491,
       "raw": "[+] nc ** localhost **",
       "normalized": "nc ** localhost **",
       "action": "allow",
@@ -9775,8 +9800,8 @@
       }
     },
     {
-      "id": "rule_491",
-      "line": 491,
+      "id": "rule_492",
+      "line": 492,
       "raw": "[+] nc ** 127.0.0.1 **",
       "normalized": "nc ** 127.0.0.1 **",
       "action": "allow",
@@ -9808,8 +9833,8 @@
       }
     },
     {
-      "id": "rule_492",
-      "line": 492,
+      "id": "rule_493",
+      "line": 493,
       "raw": "[~] nc ** #Remote netcat \u2014 confirm intent",
       "normalized": "nc **",
       "action": "ask",
@@ -9833,8 +9858,8 @@
       "hint": "Remote netcat \u2014 confirm intent"
     },
     {
-      "id": "rule_499",
-      "line": 499,
+      "id": "rule_500",
+      "line": 500,
       "raw": "[+] python **",
       "normalized": "python **",
       "action": "allow",
@@ -9857,8 +9882,8 @@
       }
     },
     {
-      "id": "rule_500",
-      "line": 500,
+      "id": "rule_501",
+      "line": 501,
       "raw": "[+] python3 **",
       "normalized": "python3 **",
       "action": "allow",
@@ -9881,8 +9906,8 @@
       }
     },
     {
-      "id": "rule_503",
-      "line": 503,
+      "id": "rule_504",
+      "line": 504,
       "raw": "[+] uv ** add ** #Approved: adding package dependency",
       "normalized": "uv ** add **",
       "action": "allow",
@@ -9915,8 +9940,8 @@
       "hint": "Approved: adding package dependency"
     },
     {
-      "id": "rule_504",
-      "line": 504,
+      "id": "rule_505",
+      "line": 505,
       "raw": "[~] uv ** remove ** #Removing package \u2014 confirm before modifying dependencies",
       "normalized": "uv ** remove **",
       "action": "ask",
@@ -9949,8 +9974,8 @@
       "hint": "Removing package \u2014 confirm before modifying dependencies"
     },
     {
-      "id": "rule_505",
-      "line": 505,
+      "id": "rule_506",
+      "line": 506,
       "raw": "[+] uv ** run **",
       "normalized": "uv ** run **",
       "action": "allow",
@@ -9982,8 +10007,8 @@
       }
     },
     {
-      "id": "rule_506",
-      "line": 506,
+      "id": "rule_507",
+      "line": 507,
       "raw": "[+] uv ** sync ** #Approved: syncing project dependencies",
       "normalized": "uv ** sync **",
       "action": "allow",
@@ -10016,8 +10041,8 @@
       "hint": "Approved: syncing project dependencies"
     },
     {
-      "id": "rule_507",
-      "line": 507,
+      "id": "rule_508",
+      "line": 508,
       "raw": "[+] uv ** pip ** #Approved: managing packages via uv pip",
       "normalized": "uv ** pip **",
       "action": "allow",
@@ -10050,8 +10075,8 @@
       "hint": "Approved: managing packages via uv pip"
     },
     {
-      "id": "rule_508",
-      "line": 508,
+      "id": "rule_509",
+      "line": 509,
       "raw": "[+] uv ** lock ** #Approved: updating dependency lockfile",
       "normalized": "uv ** lock **",
       "action": "allow",
@@ -10084,8 +10109,8 @@
       "hint": "Approved: updating dependency lockfile"
     },
     {
-      "id": "rule_509",
-      "line": 509,
+      "id": "rule_510",
+      "line": 510,
       "raw": "[+] uv ** tree **",
       "normalized": "uv ** tree **",
       "action": "allow",
@@ -10117,8 +10142,8 @@
       }
     },
     {
-      "id": "rule_510",
-      "line": 510,
+      "id": "rule_511",
+      "line": 511,
       "raw": "[+] uvx **",
       "normalized": "uvx **",
       "action": "allow",
@@ -10141,8 +10166,8 @@
       }
     },
     {
-      "id": "rule_513",
-      "line": 513,
+      "id": "rule_514",
+      "line": 514,
       "raw": "[+] npm ** install ** #Approved: installing npm packages (venv-scoped)",
       "normalized": "npm ** install **",
       "action": "allow",
@@ -10175,8 +10200,8 @@
       "hint": "Approved: installing npm packages (venv-scoped)"
     },
     {
-      "id": "rule_514",
-      "line": 514,
+      "id": "rule_515",
+      "line": 515,
       "raw": "[+] npm ** ci ** #Approved: clean npm install (venv-scoped)",
       "normalized": "npm ** ci **",
       "action": "allow",
@@ -10209,8 +10234,8 @@
       "hint": "Approved: clean npm install (venv-scoped)"
     },
     {
-      "id": "rule_515",
-      "line": 515,
+      "id": "rule_516",
+      "line": 516,
       "raw": "[+] npm ** run **",
       "normalized": "npm ** run **",
       "action": "allow",
@@ -10242,8 +10267,8 @@
       }
     },
     {
-      "id": "rule_516",
-      "line": 516,
+      "id": "rule_517",
+      "line": 517,
       "raw": "[+] npm ** test **",
       "normalized": "npm ** test **",
       "action": "allow",
@@ -10275,8 +10300,8 @@
       }
     },
     {
-      "id": "rule_517",
-      "line": 517,
+      "id": "rule_518",
+      "line": 518,
       "raw": "[+] pnpm **",
       "normalized": "pnpm **",
       "action": "allow",
@@ -10299,8 +10324,8 @@
       }
     },
     {
-      "id": "rule_518",
-      "line": 518,
+      "id": "rule_519",
+      "line": 519,
       "raw": "[+] npx ** tsc **",
       "normalized": "npx ** tsc **",
       "action": "allow",
@@ -10332,8 +10357,8 @@
       }
     },
     {
-      "id": "rule_519",
-      "line": 519,
+      "id": "rule_520",
+      "line": 520,
       "raw": "[+] npx ** vite **",
       "normalized": "npx ** vite **",
       "action": "allow",
@@ -10365,8 +10390,8 @@
       }
     },
     {
-      "id": "rule_520",
-      "line": 520,
+      "id": "rule_521",
+      "line": 521,
       "raw": "[+] npx ** vitest **",
       "normalized": "npx ** vitest **",
       "action": "allow",
@@ -10398,8 +10423,8 @@
       }
     },
     {
-      "id": "rule_521",
-      "line": 521,
+      "id": "rule_522",
+      "line": 522,
       "raw": "[+] npx ** cypress **",
       "normalized": "npx ** cypress **",
       "action": "allow",
@@ -10431,8 +10456,8 @@
       }
     },
     {
-      "id": "rule_522",
-      "line": 522,
+      "id": "rule_523",
+      "line": 523,
       "raw": "[+] npx ** biome **",
       "normalized": "npx ** biome **",
       "action": "allow",
@@ -10464,8 +10489,32 @@
       }
     },
     {
-      "id": "rule_530",
-      "line": 530,
+      "id": "rule_526",
+      "line": 526,
+      "raw": "[+] cargo **",
+      "normalized": "cargo **",
+      "action": "allow",
+      "tokens": [
+        {
+          "type": "literal",
+          "value": "cargo"
+        },
+        {
+          "type": "wildcard_multi"
+        }
+      ],
+      "specificity": {
+        "literal_count": 1,
+        "weight_vector": [
+          "literal",
+          "multi_wildcard"
+        ],
+        "content_score": 10
+      }
+    },
+    {
+      "id": "rule_533",
+      "line": 533,
       "raw": "[-] terraform ** destroy ** #Do not run terraform destroy \u2014 run this manually",
       "normalized": "terraform ** destroy **",
       "action": "deny",
@@ -10498,8 +10547,8 @@
       "hint": "Do not run terraform destroy \u2014 run this manually"
     },
     {
-      "id": "rule_531",
-      "line": 531,
+      "id": "rule_534",
+      "line": 534,
       "raw": "[-] terraform ** apply ** #Do not run terraform apply \u2014 run this manually",
       "normalized": "terraform ** apply **",
       "action": "deny",
@@ -10532,8 +10581,8 @@
       "hint": "Do not run terraform apply \u2014 run this manually"
     },
     {
-      "id": "rule_532",
-      "line": 532,
+      "id": "rule_535",
+      "line": 535,
       "raw": "[+] terraform ** plan **",
       "normalized": "terraform ** plan **",
       "action": "allow",
@@ -10565,8 +10614,8 @@
       }
     },
     {
-      "id": "rule_533",
-      "line": 533,
+      "id": "rule_536",
+      "line": 536,
       "raw": "[+] terraform ** validate **",
       "normalized": "terraform ** validate **",
       "action": "allow",
@@ -10598,8 +10647,8 @@
       }
     },
     {
-      "id": "rule_534",
-      "line": 534,
+      "id": "rule_537",
+      "line": 537,
       "raw": "[+] terraform ** workspace **",
       "normalized": "terraform ** workspace **",
       "action": "allow",
@@ -10631,8 +10680,8 @@
       }
     },
     {
-      "id": "rule_535",
-      "line": 535,
+      "id": "rule_538",
+      "line": 538,
       "raw": "[+] terraform ** init ** #Approved: initializing Terraform working directory",
       "normalized": "terraform ** init **",
       "action": "allow",
@@ -10665,8 +10714,8 @@
       "hint": "Approved: initializing Terraform working directory"
     },
     {
-      "id": "rule_538",
-      "line": 538,
+      "id": "rule_541",
+      "line": 541,
       "raw": "[?] docker ** push ** #Pushing image to registry requires human confirmation",
       "normalized": "docker ** push **",
       "action": "require_ask",
@@ -10699,8 +10748,8 @@
       "hint": "Pushing image to registry requires human confirmation"
     },
     {
-      "id": "rule_539",
-      "line": 539,
+      "id": "rule_542",
+      "line": 542,
       "raw": "[+] docker ** run ** #Approved: running a container (valid debug tool)",
       "normalized": "docker ** run **",
       "action": "allow",
@@ -10733,8 +10782,8 @@
       "hint": "Approved: running a container (valid debug tool)"
     },
     {
-      "id": "rule_540",
-      "line": 540,
+      "id": "rule_543",
+      "line": 543,
       "raw": "[+] docker ** compose ** logs **",
       "normalized": "docker ** compose ** logs **",
       "action": "allow",
@@ -10775,8 +10824,8 @@
       }
     },
     {
-      "id": "rule_541",
-      "line": 541,
+      "id": "rule_544",
+      "line": 544,
       "raw": "[+] docker ** compose ** ps **",
       "normalized": "docker ** compose ** ps **",
       "action": "allow",
@@ -10817,8 +10866,8 @@
       }
     },
     {
-      "id": "rule_542",
-      "line": 542,
+      "id": "rule_545",
+      "line": 545,
       "raw": "[+] docker ** compose ** build ** #Approved: building Docker Compose services",
       "normalized": "docker ** compose ** build **",
       "action": "allow",
@@ -10860,8 +10909,8 @@
       "hint": "Approved: building Docker Compose services"
     },
     {
-      "id": "rule_543",
-      "line": 543,
+      "id": "rule_546",
+      "line": 546,
       "raw": "[+] docker ** build ** #Approved: building Docker image",
       "normalized": "docker ** build **",
       "action": "allow",
@@ -10894,8 +10943,8 @@
       "hint": "Approved: building Docker image"
     },
     {
-      "id": "rule_544",
-      "line": 544,
+      "id": "rule_547",
+      "line": 547,
       "raw": "[+] docker ** image **",
       "normalized": "docker ** image **",
       "action": "allow",
@@ -10927,8 +10976,8 @@
       }
     },
     {
-      "id": "rule_545",
-      "line": 545,
+      "id": "rule_548",
+      "line": 548,
       "raw": "[+] docker ** images **",
       "normalized": "docker ** images **",
       "action": "allow",
@@ -10960,8 +11009,8 @@
       }
     },
     {
-      "id": "rule_546",
-      "line": 546,
+      "id": "rule_549",
+      "line": 549,
       "raw": "[+] docker ** ps **",
       "normalized": "docker ** ps **",
       "action": "allow",
@@ -10993,8 +11042,8 @@
       }
     },
     {
-      "id": "rule_547",
-      "line": 547,
+      "id": "rule_550",
+      "line": 550,
       "raw": "[+] docker ** inspect **",
       "normalized": "docker ** inspect **",
       "action": "allow",
@@ -11026,8 +11075,8 @@
       }
     },
     {
-      "id": "rule_552",
-      "line": 552,
+      "id": "rule_555",
+      "line": 555,
       "raw": "[+] gh ** pr **",
       "normalized": "gh ** pr **",
       "action": "allow",
@@ -11059,8 +11108,8 @@
       }
     },
     {
-      "id": "rule_553",
-      "line": 553,
+      "id": "rule_556",
+      "line": 556,
       "raw": "[+] gh ** repo **",
       "normalized": "gh ** repo **",
       "action": "allow",
@@ -11092,8 +11141,8 @@
       }
     },
     {
-      "id": "rule_554",
-      "line": 554,
+      "id": "rule_557",
+      "line": 557,
       "raw": "[+] gh ** api **",
       "normalized": "gh ** api **",
       "action": "allow",
@@ -11125,8 +11174,8 @@
       }
     },
     {
-      "id": "rule_555",
-      "line": 555,
+      "id": "rule_558",
+      "line": 558,
       "raw": "[+] gh ** run **",
       "normalized": "gh ** run **",
       "action": "allow",
@@ -11158,8 +11207,8 @@
       }
     },
     {
-      "id": "rule_556",
-      "line": 556,
+      "id": "rule_559",
+      "line": 559,
       "raw": "[+] gh ** auth **",
       "normalized": "gh ** auth **",
       "action": "allow",
@@ -11191,8 +11240,8 @@
       }
     },
     {
-      "id": "rule_557",
-      "line": 557,
+      "id": "rule_560",
+      "line": 560,
       "raw": "[+] gh ** issue **",
       "normalized": "gh ** issue **",
       "action": "allow",
@@ -11224,8 +11273,8 @@
       }
     },
     {
-      "id": "rule_558",
-      "line": 558,
+      "id": "rule_561",
+      "line": 561,
       "raw": "[+] gh ** release **",
       "normalized": "gh ** release **",
       "action": "allow",
@@ -11257,8 +11306,8 @@
       }
     },
     {
-      "id": "rule_561",
-      "line": 561,
+      "id": "rule_564",
+      "line": 564,
       "raw": "[-] psql ** -c ** DROP ** #Use: run DROP statements manually",
       "normalized": "psql ** -c ** drop **",
       "action": "deny",
@@ -11300,8 +11349,8 @@
       "hint": "Use: run DROP statements manually"
     },
     {
-      "id": "rule_562",
-      "line": 562,
+      "id": "rule_565",
+      "line": 565,
       "raw": "[-] psql ** -c ** TRUNCATE ** #Use: run TRUNCATE statements manually",
       "normalized": "psql ** -c ** truncate **",
       "action": "deny",
@@ -11343,8 +11392,8 @@
       "hint": "Use: run TRUNCATE statements manually"
     },
     {
-      "id": "rule_563",
-      "line": 563,
+      "id": "rule_566",
+      "line": 566,
       "raw": "[~] psql ** -f ** #Running SQL file \u2014 confirm contents before executing",
       "normalized": "psql ** -f **",
       "action": "ask",
@@ -11377,8 +11426,8 @@
       "hint": "Running SQL file \u2014 confirm contents before executing"
     },
     {
-      "id": "rule_564",
-      "line": 564,
+      "id": "rule_567",
+      "line": 567,
       "raw": "[~] psql ** -c ** #Executing SQL \u2014 confirm query before running",
       "normalized": "psql ** -c **",
       "action": "ask",
@@ -11411,8 +11460,8 @@
       "hint": "Executing SQL \u2014 confirm query before running"
     },
     {
-      "id": "rule_565",
-      "line": 565,
+      "id": "rule_568",
+      "line": 568,
       "raw": "[+] psql **",
       "normalized": "psql **",
       "action": "allow",
@@ -11435,8 +11484,8 @@
       }
     },
     {
-      "id": "rule_567",
-      "line": 567,
+      "id": "rule_570",
+      "line": 570,
       "raw": "[-] task ** deploy** #Use: deploy manually or through CI/CD",
       "normalized": "task ** deploy**",
       "action": "deny",
@@ -11465,8 +11514,8 @@
       "hint": "Use: deploy manually or through CI/CD"
     },
     {
-      "id": "rule_568",
-      "line": 568,
+      "id": "rule_571",
+      "line": 571,
       "raw": "[-] task ** migrate** #Use: run migrations manually to verify output",
       "normalized": "task ** migrate**",
       "action": "deny",
@@ -11495,8 +11544,8 @@
       "hint": "Use: run migrations manually to verify output"
     },
     {
-      "id": "rule_569",
-      "line": 569,
+      "id": "rule_572",
+      "line": 572,
       "raw": "[~] task ** db:* #Database tasks \u2014 confirm intent",
       "normalized": "task ** db:*",
       "action": "ask",
@@ -11525,8 +11574,8 @@
       "hint": "Database tasks \u2014 confirm intent"
     },
     {
-      "id": "rule_570",
-      "line": 570,
+      "id": "rule_573",
+      "line": 573,
       "raw": "[+] task **",
       "normalized": "task **",
       "action": "allow",
@@ -11549,8 +11598,8 @@
       }
     },
     {
-      "id": "rule_574",
-      "line": 574,
+      "id": "rule_577",
+      "line": 577,
       "raw": "[-] stripe post ** #Stripe API mutations not permitted \u2014 use Dashboard instead",
       "normalized": "stripe post **",
       "action": "deny",
@@ -11579,8 +11628,8 @@
       "hint": "Stripe API mutations not permitted \u2014 use Dashboard instead"
     },
     {
-      "id": "rule_575",
-      "line": 575,
+      "id": "rule_578",
+      "line": 578,
       "raw": "[-] stripe delete ** #Stripe API deletes not permitted \u2014 use Dashboard instead",
       "normalized": "stripe delete **",
       "action": "deny",
@@ -11609,8 +11658,8 @@
       "hint": "Stripe API deletes not permitted \u2014 use Dashboard instead"
     },
     {
-      "id": "rule_576",
-      "line": 576,
+      "id": "rule_579",
+      "line": 579,
       "raw": "[-] stripe payouts ** #Payout operations not permitted \u2014 use Dashboard instead",
       "normalized": "stripe payouts **",
       "action": "deny",
@@ -11639,8 +11688,8 @@
       "hint": "Payout operations not permitted \u2014 use Dashboard instead"
     },
     {
-      "id": "rule_577",
-      "line": 577,
+      "id": "rule_580",
+      "line": 580,
       "raw": "[-] stripe transfers ** #Transfer operations not permitted \u2014 use Dashboard instead",
       "normalized": "stripe transfers **",
       "action": "deny",
@@ -11669,8 +11718,8 @@
       "hint": "Transfer operations not permitted \u2014 use Dashboard instead"
     },
     {
-      "id": "rule_578",
-      "line": 578,
+      "id": "rule_581",
+      "line": 581,
       "raw": "[-] stripe topups ** #Top-up operations not permitted \u2014 use Dashboard instead",
       "normalized": "stripe topups **",
       "action": "deny",
@@ -11699,8 +11748,8 @@
       "hint": "Top-up operations not permitted \u2014 use Dashboard instead"
     },
     {
-      "id": "rule_580",
-      "line": 580,
+      "id": "rule_583",
+      "line": 583,
       "raw": "[+] stripe listen ** #Approved: forwarding webhook events to local endpoint",
       "normalized": "stripe listen **",
       "action": "allow",
@@ -11729,8 +11778,8 @@
       "hint": "Approved: forwarding webhook events to local endpoint"
     },
     {
-      "id": "rule_581",
-      "line": 581,
+      "id": "rule_584",
+      "line": 584,
       "raw": "[+] stripe trigger ** #Approved: triggering test webhook events",
       "normalized": "stripe trigger **",
       "action": "allow",
@@ -11759,8 +11808,8 @@
       "hint": "Approved: triggering test webhook events"
     },
     {
-      "id": "rule_582",
-      "line": 582,
+      "id": "rule_585",
+      "line": 585,
       "raw": "[+] stripe logs ** tail ** #Approved: tailing Stripe API logs",
       "normalized": "stripe logs ** tail **",
       "action": "allow",
@@ -11798,8 +11847,8 @@
       "hint": "Approved: tailing Stripe API logs"
     },
     {
-      "id": "rule_583",
-      "line": 583,
+      "id": "rule_586",
+      "line": 586,
       "raw": "[+] stripe version ** #Approved: Stripe CLI version info",
       "normalized": "stripe version **",
       "action": "allow",
@@ -11828,8 +11877,8 @@
       "hint": "Approved: Stripe CLI version info"
     },
     {
-      "id": "rule_584",
-      "line": 584,
+      "id": "rule_587",
+      "line": 587,
       "raw": "[+] stripe --version ** #Approved: Stripe CLI version info",
       "normalized": "stripe --version **",
       "action": "allow",
@@ -11858,8 +11907,8 @@
       "hint": "Approved: Stripe CLI version info"
     },
     {
-      "id": "rule_585",
-      "line": 585,
+      "id": "rule_588",
+      "line": 588,
       "raw": "[+] stripe config ** #Approved: viewing Stripe CLI config",
       "normalized": "stripe config **",
       "action": "allow",
@@ -11888,8 +11937,8 @@
       "hint": "Approved: viewing Stripe CLI config"
     },
     {
-      "id": "rule_586",
-      "line": 586,
+      "id": "rule_589",
+      "line": 589,
       "raw": "[+] stripe status ** #Approved: checking Stripe API status",
       "normalized": "stripe status **",
       "action": "allow",
@@ -11918,8 +11967,8 @@
       "hint": "Approved: checking Stripe API status"
     },
     {
-      "id": "rule_587",
-      "line": 587,
+      "id": "rule_590",
+      "line": 590,
       "raw": "[+] stripe events ** resend ** #Approved: resending a specific webhook event by ID",
       "normalized": "stripe events ** resend **",
       "action": "allow",
@@ -11957,8 +12006,8 @@
       "hint": "Approved: resending a specific webhook event by ID"
     },
     {
-      "id": "rule_588",
-      "line": 588,
+      "id": "rule_591",
+      "line": 591,
       "raw": "[+] stripe help ** #Approved: Stripe CLI help",
       "normalized": "stripe help **",
       "action": "allow",
@@ -11987,8 +12036,8 @@
       "hint": "Approved: Stripe CLI help"
     },
     {
-      "id": "rule_589",
-      "line": 589,
+      "id": "rule_592",
+      "line": 592,
       "raw": "[+] stripe completion ** #Approved: shell completion setup",
       "normalized": "stripe completion **",
       "action": "allow",
@@ -12017,8 +12066,8 @@
       "hint": "Approved: shell completion setup"
     },
     {
-      "id": "rule_591",
-      "line": 591,
+      "id": "rule_594",
+      "line": 594,
       "raw": "[~] stripe ** #Confirm: Stripe CLI command \u2014 verify intent before running",
       "normalized": "stripe **",
       "action": "ask",
@@ -12042,8 +12091,8 @@
       "hint": "Confirm: Stripe CLI command \u2014 verify intent before running"
     },
     {
-      "id": "rule_594",
-      "line": 594,
+      "id": "rule_597",
+      "line": 597,
       "raw": "[-] mkcert ** -install ** #Installing root CA not allowed without manual action",
       "normalized": "mkcert ** -install **",
       "action": "deny",
@@ -12076,8 +12125,8 @@
       "hint": "Installing root CA not allowed without manual action"
     },
     {
-      "id": "rule_595",
-      "line": 595,
+      "id": "rule_598",
+      "line": 598,
       "raw": "[?] mkcert ** #Creating or installing certificates requires human confirmation",
       "normalized": "mkcert **",
       "action": "require_ask",
@@ -12101,8 +12150,8 @@
       "hint": "Creating or installing certificates requires human confirmation"
     },
     {
-      "id": "rule_604",
-      "line": 604,
+      "id": "rule_607",
+      "line": 607,
       "raw": "[+] wsl --version **",
       "normalized": "wsl --version **",
       "action": "allow",
@@ -12130,8 +12179,8 @@
       }
     },
     {
-      "id": "rule_605",
-      "line": 605,
+      "id": "rule_608",
+      "line": 608,
       "raw": "[+] wsl --list **",
       "normalized": "wsl --list **",
       "action": "allow",
@@ -12159,8 +12208,8 @@
       }
     },
     {
-      "id": "rule_606",
-      "line": 606,
+      "id": "rule_609",
+      "line": 609,
       "raw": "[+] wsl --status **",
       "normalized": "wsl --status **",
       "action": "allow",
@@ -12188,8 +12237,8 @@
       }
     },
     {
-      "id": "rule_609",
-      "line": 609,
+      "id": "rule_612",
+      "line": 612,
       "raw": "[+] wsl ** cat **",
       "normalized": "wsl ** cat **",
       "action": "allow",
@@ -12221,8 +12270,8 @@
       }
     },
     {
-      "id": "rule_610",
-      "line": 610,
+      "id": "rule_613",
+      "line": 613,
       "raw": "[+] wsl ** head **",
       "normalized": "wsl ** head **",
       "action": "allow",
@@ -12254,8 +12303,8 @@
       }
     },
     {
-      "id": "rule_611",
-      "line": 611,
+      "id": "rule_614",
+      "line": 614,
       "raw": "[+] wsl ** tail **",
       "normalized": "wsl ** tail **",
       "action": "allow",
@@ -12287,8 +12336,8 @@
       }
     },
     {
-      "id": "rule_612",
-      "line": 612,
+      "id": "rule_615",
+      "line": 615,
       "raw": "[+] wsl ** ls **",
       "normalized": "wsl ** ls **",
       "action": "allow",
@@ -12320,8 +12369,8 @@
       }
     },
     {
-      "id": "rule_613",
-      "line": 613,
+      "id": "rule_616",
+      "line": 616,
       "raw": "[+] wsl ** find **",
       "normalized": "wsl ** find **",
       "action": "allow",
@@ -12353,8 +12402,8 @@
       }
     },
     {
-      "id": "rule_614",
-      "line": 614,
+      "id": "rule_617",
+      "line": 617,
       "raw": "[+] wsl ** wc **",
       "normalized": "wsl ** wc **",
       "action": "allow",
@@ -12386,8 +12435,8 @@
       }
     },
     {
-      "id": "rule_617",
-      "line": 617,
+      "id": "rule_620",
+      "line": 620,
       "raw": "[-] wsl ** gh ** #Use: gh directly \u2014 no WSL needed",
       "normalized": "wsl ** gh **",
       "action": "deny",
@@ -12420,8 +12469,8 @@
       "hint": "Use: gh directly \u2014 no WSL needed"
     },
     {
-      "id": "rule_618",
-      "line": 618,
+      "id": "rule_621",
+      "line": 621,
       "raw": "[-] wsl ** git ** #Use: git directly \u2014 no WSL needed",
       "normalized": "wsl ** git **",
       "action": "deny",
@@ -12454,8 +12503,8 @@
       "hint": "Use: git directly \u2014 no WSL needed"
     },
     {
-      "id": "rule_619",
-      "line": 619,
+      "id": "rule_622",
+      "line": 622,
       "raw": "[-] wsl ** bash ** #Use: kiro-cli directly \u2014 no WSL shell needed",
       "normalized": "wsl ** bash **",
       "action": "deny",
@@ -12488,8 +12537,8 @@
       "hint": "Use: kiro-cli directly \u2014 no WSL shell needed"
     },
     {
-      "id": "rule_620",
-      "line": 620,
+      "id": "rule_623",
+      "line": 623,
       "raw": "[-] wsl ** sh ** #Use: kiro-cli directly \u2014 no WSL shell needed",
       "normalized": "wsl ** sh **",
       "action": "deny",
@@ -12522,8 +12571,8 @@
       "hint": "Use: kiro-cli directly \u2014 no WSL shell needed"
     },
     {
-      "id": "rule_623",
-      "line": 623,
+      "id": "rule_626",
+      "line": 626,
       "raw": "[~] wsl ** #WSL passthrough \u2014 confirm intent",
       "normalized": "wsl **",
       "action": "ask",
@@ -12547,8 +12596,8 @@
       "hint": "WSL passthrough \u2014 confirm intent"
     },
     {
-      "id": "rule_625",
-      "line": 625,
+      "id": "rule_628",
+      "line": 628,
       "raw": "[+] puppy **",
       "normalized": "puppy **",
       "action": "allow",
@@ -12571,8 +12620,8 @@
       }
     },
     {
-      "id": "rule_626",
-      "line": 626,
+      "id": "rule_629",
+      "line": 629,
       "raw": "[+] kiro **",
       "normalized": "kiro **",
       "action": "allow",
@@ -12595,8 +12644,8 @@
       }
     },
     {
-      "id": "rule_627",
-      "line": 627,
+      "id": "rule_630",
+      "line": 630,
       "raw": "[+] kiro-cli **",
       "normalized": "kiro-cli **",
       "action": "allow",
@@ -12619,8 +12668,8 @@
       }
     },
     {
-      "id": "rule_628",
-      "line": 628,
+      "id": "rule_631",
+      "line": 631,
       "raw": "[+] codex **",
       "normalized": "codex **",
       "action": "allow",
@@ -12643,8 +12692,8 @@
       }
     },
     {
-      "id": "rule_629",
-      "line": 629,
+      "id": "rule_632",
+      "line": 632,
       "raw": "[+] c-guard **",
       "normalized": "c-guard **",
       "action": "allow",
@@ -12667,8 +12716,8 @@
       }
     },
     {
-      "id": "rule_630",
-      "line": 630,
+      "id": "rule_633",
+      "line": 633,
       "raw": "[?] usePwsh7 ** Aws-GetSecret ** prod ** #Fetching prod secrets requires human approval \u2014 do not run autonomously",
       "normalized": "usepwsh7 ** aws-getsecret ** prod **",
       "action": "require_ask",
@@ -12710,8 +12759,8 @@
       "hint": "Fetching prod secrets requires human approval \u2014 do not run autonomously"
     },
     {
-      "id": "rule_631",
-      "line": 631,
+      "id": "rule_634",
+      "line": 634,
       "raw": "[?] usePwsh7 ** Aws-SecretFind ** prod ** #Fetching prod secrets requires human approval \u2014 do not run autonomously",
       "normalized": "usepwsh7 ** aws-secretfind ** prod **",
       "action": "require_ask",
@@ -12753,8 +12802,8 @@
       "hint": "Fetching prod secrets requires human approval \u2014 do not run autonomously"
     },
     {
-      "id": "rule_632",
-      "line": 632,
+      "id": "rule_635",
+      "line": 635,
       "raw": "[?] usePwsh7 ** Secret-Read ** #Reading secrets requires human approval \u2014 do not run autonomously",
       "normalized": "usepwsh7 ** secret-read **",
       "action": "require_ask",
@@ -12787,8 +12836,8 @@
       "hint": "Reading secrets requires human approval \u2014 do not run autonomously"
     },
     {
-      "id": "rule_633",
-      "line": 633,
+      "id": "rule_636",
+      "line": 636,
       "raw": "[+] usePwsh7 **",
       "normalized": "usepwsh7 **",
       "action": "allow",
@@ -12811,8 +12860,8 @@
       }
     },
     {
-      "id": "rule_637",
-      "line": 637,
+      "id": "rule_640",
+      "line": 640,
       "raw": "[+] bash ** #Approved: dangerous variants contained by deny/ask rules above",
       "normalized": "bash **",
       "action": "allow",
@@ -12836,8 +12885,8 @@
       "hint": "Approved: dangerous variants contained by deny/ask rules above"
     },
     {
-      "id": "rule_638",
-      "line": 638,
+      "id": "rule_641",
+      "line": 641,
       "raw": "[+] pwsh ** #Approved: dangerous variants contained by deny/ask rules above",
       "normalized": "pwsh **",
       "action": "allow",
@@ -12861,8 +12910,8 @@
       "hint": "Approved: dangerous variants contained by deny/ask rules above"
     },
     {
-      "id": "rule_647",
-      "line": 647,
+      "id": "rule_650",
+      "line": 650,
       "raw": "[-] powershell ** #Use: pwsh instead of powershell",
       "normalized": "powershell **",
       "action": "deny",
@@ -12886,8 +12935,8 @@
       "hint": "Use: pwsh instead of powershell"
     },
     {
-      "id": "rule_648",
-      "line": 648,
+      "id": "rule_651",
+      "line": 651,
       "raw": "[-] powershell.exe ** #Use: pwsh instead of powershell.exe",
       "normalized": "powershell.exe **",
       "action": "deny",
@@ -12911,8 +12960,8 @@
       "hint": "Use: pwsh instead of powershell.exe"
     },
     {
-      "id": "rule_649",
-      "line": 649,
+      "id": "rule_652",
+      "line": 652,
       "raw": "[-] *\\powershell.exe ** #Use: pwsh instead of legacy PowerShell",
       "normalized": "*\\powershell.exe **",
       "action": "deny",
@@ -12936,8 +12985,8 @@
       "hint": "Use: pwsh instead of legacy PowerShell"
     },
     {
-      "id": "rule_650",
-      "line": 650,
+      "id": "rule_653",
+      "line": 653,
       "raw": "[-] *\\powershell ** #Use: pwsh instead of legacy PowerShell",
       "normalized": "*\\powershell **",
       "action": "deny",
@@ -12961,8 +13010,8 @@
       "hint": "Use: pwsh instead of legacy PowerShell"
     },
     {
-      "id": "rule_653",
-      "line": 653,
+      "id": "rule_656",
+      "line": 656,
       "raw": "[-] cmd ** del **",
       "normalized": "cmd ** del **",
       "action": "deny",
@@ -12994,8 +13043,8 @@
       }
     },
     {
-      "id": "rule_654",
-      "line": 654,
+      "id": "rule_657",
+      "line": 657,
       "raw": "[-] cmd ** erase **",
       "normalized": "cmd ** erase **",
       "action": "deny",
@@ -13027,8 +13076,8 @@
       }
     },
     {
-      "id": "rule_655",
-      "line": 655,
+      "id": "rule_658",
+      "line": 658,
       "raw": "[-] cmd ** rmdir **",
       "normalized": "cmd ** rmdir **",
       "action": "deny",
@@ -13060,8 +13109,8 @@
       }
     },
     {
-      "id": "rule_656",
-      "line": 656,
+      "id": "rule_659",
+      "line": 659,
       "raw": "[+] cmd **",
       "normalized": "cmd **",
       "action": "allow",
@@ -13084,8 +13133,8 @@
       }
     },
     {
-      "id": "rule_659",
-      "line": 659,
+      "id": "rule_662",
+      "line": 662,
       "raw": "[-] pwsh ** Remove-Item ** #Deleting files is not permitted",
       "normalized": "pwsh ** remove-item **",
       "action": "deny",
@@ -13118,8 +13167,8 @@
       "hint": "Deleting files is not permitted"
     },
     {
-      "id": "rule_660",
-      "line": 660,
+      "id": "rule_663",
+      "line": 663,
       "raw": "[-] pwsh ** rm ** #Alias for Remove-Item",
       "normalized": "pwsh ** rm **",
       "action": "deny",
@@ -13152,8 +13201,8 @@
       "hint": "Alias for Remove-Item"
     },
     {
-      "id": "rule_661",
-      "line": 661,
+      "id": "rule_664",
+      "line": 664,
       "raw": "[-] pwsh ** del ** #Alias for Remove-Item",
       "normalized": "pwsh ** del **",
       "action": "deny",
@@ -13186,8 +13235,8 @@
       "hint": "Alias for Remove-Item"
     },
     {
-      "id": "rule_662",
-      "line": 662,
+      "id": "rule_665",
+      "line": 665,
       "raw": "[-] pwsh ** erase ** #Alias for Remove-Item",
       "normalized": "pwsh ** erase **",
       "action": "deny",
@@ -13220,8 +13269,8 @@
       "hint": "Alias for Remove-Item"
     },
     {
-      "id": "rule_663",
-      "line": 663,
+      "id": "rule_666",
+      "line": 666,
       "raw": "[-] pwsh ** rmdir ** #Removing directories is not permitted",
       "normalized": "pwsh ** rmdir **",
       "action": "deny",
@@ -13254,8 +13303,8 @@
       "hint": "Removing directories is not permitted"
     },
     {
-      "id": "rule_666",
-      "line": 666,
+      "id": "rule_669",
+      "line": 669,
       "raw": "[-] pwsh ** .. **",
       "normalized": "pwsh ** .. **",
       "action": "deny",
@@ -13287,8 +13336,8 @@
       }
     },
     {
-      "id": "rule_667",
-      "line": 667,
+      "id": "rule_670",
+      "line": 670,
       "raw": "[-] pwsh ** .ssh*",
       "normalized": "pwsh ** .ssh*",
       "action": "deny",
@@ -13316,8 +13365,8 @@
       }
     },
     {
-      "id": "rule_668",
-      "line": 668,
+      "id": "rule_671",
+      "line": 671,
       "raw": "[-] pwsh ** .gnupg*",
       "normalized": "pwsh ** .gnupg*",
       "action": "deny",
@@ -13345,8 +13394,8 @@
       }
     },
     {
-      "id": "rule_669",
-      "line": 669,
+      "id": "rule_672",
+      "line": 672,
       "raw": "[-] pwsh ** .aws*",
       "normalized": "pwsh ** .aws*",
       "action": "deny",
@@ -13374,8 +13423,8 @@
       }
     },
     {
-      "id": "rule_672",
-      "line": 672,
+      "id": "rule_675",
+      "line": 675,
       "raw": "[~] pwsh ** *.ps1",
       "normalized": "pwsh ** *.ps1",
       "action": "ask",
@@ -13403,8 +13452,8 @@
       }
     },
     {
-      "id": "rule_673",
-      "line": 673,
+      "id": "rule_676",
+      "line": 676,
       "raw": "[~] cmd ** *.bat",
       "normalized": "cmd ** *.bat",
       "action": "ask",
@@ -13432,8 +13481,8 @@
       }
     },
     {
-      "id": "rule_674",
-      "line": 674,
+      "id": "rule_677",
+      "line": 677,
       "raw": "[~] cmd ** *.cmd",
       "normalized": "cmd ** *.cmd",
       "action": "ask",
@@ -13461,8 +13510,8 @@
       }
     },
     {
-      "id": "rule_675",
-      "line": 675,
+      "id": "rule_678",
+      "line": 678,
       "raw": "[~] pwsh ** Invoke-WebRequest ** -OutFile *.ps1",
       "normalized": "pwsh ** invoke-webrequest ** -outfile *.ps1",
       "action": "ask",
@@ -13504,8 +13553,8 @@
       }
     },
     {
-      "id": "rule_676",
-      "line": 676,
+      "id": "rule_679",
+      "line": 679,
       "raw": "[~] pwsh ** iwr ** -OutFile *.ps1",
       "normalized": "pwsh ** iwr ** -outfile *.ps1",
       "action": "ask",
@@ -13547,8 +13596,8 @@
       }
     },
     {
-      "id": "rule_679",
-      "line": 679,
+      "id": "rule_682",
+      "line": 682,
       "raw": "[-] ** $USERPROFILE\\.secrets** #Sensitive: secrets directory is off limits",
       "normalized": "** $userprofile\\.secrets**",
       "action": "deny",
@@ -13572,8 +13621,8 @@
       "hint": "Sensitive: secrets directory is off limits"
     },
     {
-      "id": "rule_680",
-      "line": 680,
+      "id": "rule_683",
+      "line": 683,
       "raw": "[-] ** $USERPROFILE\\.ssh** #Sensitive: SSH directory is off limits",
       "normalized": "** $userprofile\\.ssh**",
       "action": "deny",
@@ -13597,8 +13646,8 @@
       "hint": "Sensitive: SSH directory is off limits"
     },
     {
-      "id": "rule_681",
-      "line": 681,
+      "id": "rule_684",
+      "line": 684,
       "raw": "[-] ** $USERPROFILE\\.aws** #Sensitive: AWS credentials directory is off limits",
       "normalized": "** $userprofile\\.aws**",
       "action": "deny",
@@ -13622,8 +13671,8 @@
       "hint": "Sensitive: AWS credentials directory is off limits"
     },
     {
-      "id": "rule_682",
-      "line": 682,
+      "id": "rule_685",
+      "line": 685,
       "raw": "[-] ** C:\\Users\\willem\\.secrets** #Sensitive: secrets directory is off limits",
       "normalized": "** c:\\users\\willem\\.secrets**",
       "action": "deny",
@@ -13647,8 +13696,8 @@
       "hint": "Sensitive: secrets directory is off limits"
     },
     {
-      "id": "rule_683",
-      "line": 683,
+      "id": "rule_686",
+      "line": 686,
       "raw": "[-] ** C:\\Users\\willem\\.ssh** #Sensitive: SSH directory is off limits",
       "normalized": "** c:\\users\\willem\\.ssh**",
       "action": "deny",
@@ -13672,8 +13721,8 @@
       "hint": "Sensitive: SSH directory is off limits"
     },
     {
-      "id": "rule_684",
-      "line": 684,
+      "id": "rule_687",
+      "line": 687,
       "raw": "[-] ** C:\\Users\\willem\\.aws** #Sensitive: AWS credentials directory is off limits",
       "normalized": "** c:\\users\\willem\\.aws**",
       "action": "deny",
@@ -13697,8 +13746,8 @@
       "hint": "Sensitive: AWS credentials directory is off limits"
     },
     {
-      "id": "rule_685",
-      "line": 685,
+      "id": "rule_688",
+      "line": 688,
       "raw": "[?] usePwsh7 ** Aws-Switch ** prod ** #Switching to a prod AWS profile requires human approval",
       "normalized": "usepwsh7 ** aws-switch ** prod **",
       "action": "require_ask",
@@ -13740,8 +13789,8 @@
       "hint": "Switching to a prod AWS profile requires human approval"
     },
     {
-      "id": "rule_685",
-      "line": 685,
+      "id": "rule_688",
+      "line": 688,
       "raw": "[?] usePwsh7 ** Aws-Switch ** prod-ltc ** #Switching to a prod AWS profile requires human approval",
       "normalized": "usepwsh7 ** aws-switch ** prod-ltc **",
       "action": "require_ask",
@@ -13783,8 +13832,8 @@
       "hint": "Switching to a prod AWS profile requires human approval"
     },
     {
-      "id": "rule_686",
-      "line": 686,
+      "id": "rule_689",
+      "line": 689,
       "raw": "[?] usePwsh7 ** prod ** Aws-Switch ** #Switching to a prod AWS profile requires human approval",
       "normalized": "usepwsh7 ** prod ** aws-switch **",
       "action": "require_ask",
@@ -13826,8 +13875,8 @@
       "hint": "Switching to a prod AWS profile requires human approval"
     },
     {
-      "id": "rule_686",
-      "line": 686,
+      "id": "rule_689",
+      "line": 689,
       "raw": "[?] usePwsh7 ** prod-ltc ** Aws-Switch ** #Switching to a prod AWS profile requires human approval",
       "normalized": "usepwsh7 ** prod-ltc ** aws-switch **",
       "action": "require_ask",
@@ -13869,8 +13918,8 @@
       "hint": "Switching to a prod AWS profile requires human approval"
     },
     {
-      "id": "rule_687",
-      "line": 687,
+      "id": "rule_690",
+      "line": 690,
       "raw": "[?] aws ** --profile prod ** #Direct AWS CLI on prod profiles is blocked \u2014 use usePwsh7 with owner approval",
       "normalized": "aws ** --profile prod **",
       "action": "require_ask",
@@ -13908,8 +13957,8 @@
       "hint": "Direct AWS CLI on prod profiles is blocked \u2014 use usePwsh7 with owner approval"
     },
     {
-      "id": "rule_687",
-      "line": 687,
+      "id": "rule_690",
+      "line": 690,
       "raw": "[?] aws ** --profile prod-ltc ** #Direct AWS CLI on prod profiles is blocked \u2014 use usePwsh7 with owner approval",
       "normalized": "aws ** --profile prod-ltc **",
       "action": "require_ask",
@@ -13947,8 +13996,8 @@
       "hint": "Direct AWS CLI on prod profiles is blocked \u2014 use usePwsh7 with owner approval"
     },
     {
-      "id": "rule_688",
-      "line": 688,
+      "id": "rule_691",
+      "line": 691,
       "raw": "[?] aws ** --profile=prod** #Direct AWS CLI on prod profiles is blocked \u2014 use usePwsh7 with owner approval",
       "normalized": "aws ** --profile=prod**",
       "action": "require_ask",
@@ -13977,8 +14026,8 @@
       "hint": "Direct AWS CLI on prod profiles is blocked \u2014 use usePwsh7 with owner approval"
     },
     {
-      "id": "rule_694",
-      "line": 694,
+      "id": "rule_697",
+      "line": 697,
       "raw": "[-] pwsh ** -Command ** #Use: usePwsh7 <cmd>",
       "normalized": "pwsh ** -command **",
       "action": "deny",
@@ -14011,8 +14060,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_694",
-      "line": 694,
+      "id": "rule_697",
+      "line": 697,
       "raw": "[-] pwsh.exe ** -Command ** #Use: usePwsh7 <cmd>",
       "normalized": "pwsh.exe ** -command **",
       "action": "deny",
@@ -14045,8 +14094,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_694",
-      "line": 694,
+      "id": "rule_697",
+      "line": 697,
       "raw": "[-] *\\pwsh.exe ** -Command ** #Use: usePwsh7 <cmd>",
       "normalized": "*\\pwsh.exe ** -command **",
       "action": "deny",
@@ -14079,8 +14128,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_694",
-      "line": 694,
+      "id": "rule_697",
+      "line": 697,
       "raw": "[-] *\\pwsh ** -Command ** #Use: usePwsh7 <cmd>",
       "normalized": "*\\pwsh ** -command **",
       "action": "deny",
@@ -14113,8 +14162,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_695",
-      "line": 695,
+      "id": "rule_698",
+      "line": 698,
       "raw": "[-] pwsh ** -c ** #Use: usePwsh7 <cmd>",
       "normalized": "pwsh ** -c **",
       "action": "deny",
@@ -14147,8 +14196,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_695",
-      "line": 695,
+      "id": "rule_698",
+      "line": 698,
       "raw": "[-] pwsh.exe ** -c ** #Use: usePwsh7 <cmd>",
       "normalized": "pwsh.exe ** -c **",
       "action": "deny",
@@ -14181,8 +14230,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_695",
-      "line": 695,
+      "id": "rule_698",
+      "line": 698,
       "raw": "[-] *\\pwsh.exe ** -c ** #Use: usePwsh7 <cmd>",
       "normalized": "*\\pwsh.exe ** -c **",
       "action": "deny",
@@ -14215,8 +14264,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_695",
-      "line": 695,
+      "id": "rule_698",
+      "line": 698,
       "raw": "[-] *\\pwsh ** -c ** #Use: usePwsh7 <cmd>",
       "normalized": "*\\pwsh ** -c **",
       "action": "deny",
@@ -14249,8 +14298,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_696",
-      "line": 696,
+      "id": "rule_699",
+      "line": 699,
       "raw": "[-] pwsh ** -EncodedCommand ** #Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE",
       "normalized": "pwsh ** -encodedcommand **",
       "action": "deny",
@@ -14283,8 +14332,8 @@
       "hint": "Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE"
     },
     {
-      "id": "rule_696",
-      "line": 696,
+      "id": "rule_699",
+      "line": 699,
       "raw": "[-] pwsh.exe ** -EncodedCommand ** #Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE",
       "normalized": "pwsh.exe ** -encodedcommand **",
       "action": "deny",
@@ -14317,8 +14366,8 @@
       "hint": "Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE"
     },
     {
-      "id": "rule_696",
-      "line": 696,
+      "id": "rule_699",
+      "line": 699,
       "raw": "[-] *\\pwsh.exe ** -EncodedCommand ** #Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE",
       "normalized": "*\\pwsh.exe ** -encodedcommand **",
       "action": "deny",
@@ -14351,8 +14400,8 @@
       "hint": "Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE"
     },
     {
-      "id": "rule_696",
-      "line": 696,
+      "id": "rule_699",
+      "line": 699,
       "raw": "[-] *\\pwsh ** -EncodedCommand ** #Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE",
       "normalized": "*\\pwsh ** -encodedcommand **",
       "action": "deny",
@@ -14385,8 +14434,8 @@
       "hint": "Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE"
     },
     {
-      "id": "rule_697",
-      "line": 697,
+      "id": "rule_700",
+      "line": 700,
       "raw": "[-] pwsh ** -ec ** #Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE",
       "normalized": "pwsh ** -ec **",
       "action": "deny",
@@ -14419,8 +14468,8 @@
       "hint": "Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE"
     },
     {
-      "id": "rule_697",
-      "line": 697,
+      "id": "rule_700",
+      "line": 700,
       "raw": "[-] pwsh.exe ** -ec ** #Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE",
       "normalized": "pwsh.exe ** -ec **",
       "action": "deny",
@@ -14453,8 +14502,8 @@
       "hint": "Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE"
     },
     {
-      "id": "rule_697",
-      "line": 697,
+      "id": "rule_700",
+      "line": 700,
       "raw": "[-] *\\pwsh.exe ** -ec ** #Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE",
       "normalized": "*\\pwsh.exe ** -ec **",
       "action": "deny",
@@ -14487,8 +14536,8 @@
       "hint": "Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE"
     },
     {
-      "id": "rule_697",
-      "line": 697,
+      "id": "rule_700",
+      "line": 700,
       "raw": "[-] *\\pwsh ** -ec ** #Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE",
       "normalized": "*\\pwsh ** -ec **",
       "action": "deny",
@@ -14521,8 +14570,8 @@
       "hint": "Use: usePwsh7 <cmd> \u2014 encoded form bypasses LLM_MODE"
     },
     {
-      "id": "rule_698",
-      "line": 698,
+      "id": "rule_701",
+      "line": 701,
       "raw": "[-] powershell ** -Command ** #Use: usePwsh7 <cmd>",
       "normalized": "powershell ** -command **",
       "action": "deny",
@@ -14555,8 +14604,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_698",
-      "line": 698,
+      "id": "rule_701",
+      "line": 701,
       "raw": "[-] powershell.exe ** -Command ** #Use: usePwsh7 <cmd>",
       "normalized": "powershell.exe ** -command **",
       "action": "deny",
@@ -14589,8 +14638,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_698",
-      "line": 698,
+      "id": "rule_701",
+      "line": 701,
       "raw": "[-] *\\powershell.exe ** -Command ** #Use: usePwsh7 <cmd>",
       "normalized": "*\\powershell.exe ** -command **",
       "action": "deny",
@@ -14623,8 +14672,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_698",
-      "line": 698,
+      "id": "rule_701",
+      "line": 701,
       "raw": "[-] *\\powershell ** -Command ** #Use: usePwsh7 <cmd>",
       "normalized": "*\\powershell ** -command **",
       "action": "deny",
@@ -14657,8 +14706,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_699",
-      "line": 699,
+      "id": "rule_702",
+      "line": 702,
       "raw": "[-] powershell ** -c ** #Use: usePwsh7 <cmd>",
       "normalized": "powershell ** -c **",
       "action": "deny",
@@ -14691,8 +14740,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_699",
-      "line": 699,
+      "id": "rule_702",
+      "line": 702,
       "raw": "[-] powershell.exe ** -c ** #Use: usePwsh7 <cmd>",
       "normalized": "powershell.exe ** -c **",
       "action": "deny",
@@ -14725,8 +14774,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_699",
-      "line": 699,
+      "id": "rule_702",
+      "line": 702,
       "raw": "[-] *\\powershell.exe ** -c ** #Use: usePwsh7 <cmd>",
       "normalized": "*\\powershell.exe ** -c **",
       "action": "deny",
@@ -14759,8 +14808,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_699",
-      "line": 699,
+      "id": "rule_702",
+      "line": 702,
       "raw": "[-] *\\powershell ** -c ** #Use: usePwsh7 <cmd>",
       "normalized": "*\\powershell ** -c **",
       "action": "deny",
@@ -14793,8 +14842,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_700",
-      "line": 700,
+      "id": "rule_703",
+      "line": 703,
       "raw": "[-] powershell ** -EncodedCommand ** #Use: usePwsh7 <cmd>",
       "normalized": "powershell ** -encodedcommand **",
       "action": "deny",
@@ -14827,8 +14876,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_700",
-      "line": 700,
+      "id": "rule_703",
+      "line": 703,
       "raw": "[-] powershell.exe ** -EncodedCommand ** #Use: usePwsh7 <cmd>",
       "normalized": "powershell.exe ** -encodedcommand **",
       "action": "deny",
@@ -14861,8 +14910,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_700",
-      "line": 700,
+      "id": "rule_703",
+      "line": 703,
       "raw": "[-] *\\powershell.exe ** -EncodedCommand ** #Use: usePwsh7 <cmd>",
       "normalized": "*\\powershell.exe ** -encodedcommand **",
       "action": "deny",
@@ -14895,8 +14944,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_700",
-      "line": 700,
+      "id": "rule_703",
+      "line": 703,
       "raw": "[-] *\\powershell ** -EncodedCommand ** #Use: usePwsh7 <cmd>",
       "normalized": "*\\powershell ** -encodedcommand **",
       "action": "deny",
@@ -14929,8 +14978,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_701",
-      "line": 701,
+      "id": "rule_704",
+      "line": 704,
       "raw": "[-] powershell ** -ec ** #Use: usePwsh7 <cmd>",
       "normalized": "powershell ** -ec **",
       "action": "deny",
@@ -14963,8 +15012,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_701",
-      "line": 701,
+      "id": "rule_704",
+      "line": 704,
       "raw": "[-] powershell.exe ** -ec ** #Use: usePwsh7 <cmd>",
       "normalized": "powershell.exe ** -ec **",
       "action": "deny",
@@ -14997,8 +15046,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_701",
-      "line": 701,
+      "id": "rule_704",
+      "line": 704,
       "raw": "[-] *\\powershell.exe ** -ec ** #Use: usePwsh7 <cmd>",
       "normalized": "*\\powershell.exe ** -ec **",
       "action": "deny",
@@ -15031,8 +15080,8 @@
       "hint": "Use: usePwsh7 <cmd>"
     },
     {
-      "id": "rule_701",
-      "line": 701,
+      "id": "rule_704",
+      "line": 704,
       "raw": "[-] *\\powershell ** -ec ** #Use: usePwsh7 <cmd>",
       "normalized": "*\\powershell ** -ec **",
       "action": "deny",
@@ -15146,34 +15195,34 @@
       114,
       281,
       282,
-      409,
-      410,
-      429,
-      430,
+      411,
+      412,
       431,
       432,
       433,
       434,
-      444,
-      445,
-      448,
-      449,
-      452,
-      453,
-      456,
-      457,
-      460,
-      461,
-      464,
-      465,
-      468,
-      469,
-      472,
-      473
+      435,
+      436,
+      446,
+      447,
+      450,
+      451,
+      454,
+      455,
+      458,
+      459,
+      462,
+      463,
+      466,
+      467,
+      470,
+      471,
+      474,
+      475
     ],
     "kill": [
       22,
-      304
+      305
     ],
     "killall": [
       23
@@ -15196,12 +15245,12 @@
     "python": [
       29,
       31,
-      312
+      313
     ],
     "python3": [
       30,
       32,
-      313
+      314
     ],
     "python.exe": [
       33
@@ -15230,7 +15279,7 @@
       98,
       99,
       100,
-      298
+      299
     ],
     "cp": [
       65,
@@ -15244,7 +15293,7 @@
       102,
       103,
       104,
-      297
+      298
     ],
     "ln": [
       72,
@@ -15264,7 +15313,7 @@
       80,
       81,
       109,
-      300
+      301
     ],
     "chown": [
       82,
@@ -15274,9 +15323,9 @@
     ],
     "aws": [
       115,
-      439,
-      440,
-      441
+      441,
+      442,
+      443
     ],
     "git": [
       116,
@@ -15543,101 +15592,105 @@
     "continue": [
       287
     ],
-    "diff": [
+    "read": [
       288
     ],
-    "tr": [
+    "diff": [
       289
     ],
-    "column": [
+    "tr": [
       290
     ],
-    "touch": [
+    "column": [
       291
     ],
-    "basename": [
+    "touch": [
       292
     ],
-    "dirname": [
+    "basename": [
       293
     ],
-    "realpath": [
+    "dirname": [
       294
     ],
-    "readlink": [
+    "realpath": [
       295
     ],
-    "open": [
+    "readlink": [
       296
     ],
+    "open": [
+      297
+    ],
     "mkdir": [
-      299
+      300
     ],
     "netstat": [
-      301
-    ],
-    "node": [
       302
     ],
-    "timeout": [
+    "node": [
       303
     ],
-    "strings": [
-      305
+    "timeout": [
+      304
     ],
-    "seq": [
+    "strings": [
       306
     ],
-    "base64": [
+    "seq": [
       307
     ],
-    "cygpath": [
+    "base64": [
       308
     ],
+    "cygpath": [
+      309
+    ],
     "nc": [
-      309,
       310,
-      311
+      311,
+      312
     ],
     "uv": [
-      314,
       315,
       316,
       317,
       318,
       319,
-      320
-    ],
-    "uvx": [
+      320,
       321
     ],
+    "uvx": [
+      322
+    ],
     "npm": [
-      322,
       323,
       324,
-      325
-    ],
-    "pnpm": [
+      325,
       326
     ],
+    "pnpm": [
+      327
+    ],
     "npx": [
-      327,
       328,
       329,
       330,
-      331
+      331,
+      332
+    ],
+    "cargo": [
+      333
     ],
     "terraform": [
-      332,
-      333,
       334,
       335,
       336,
-      337
+      337,
+      338,
+      339
     ],
     "docker": [
-      338,
-      339,
       340,
       341,
       342,
@@ -15645,33 +15698,33 @@
       344,
       345,
       346,
-      347
+      347,
+      348,
+      349
     ],
     "gh": [
-      348,
-      349,
       350,
       351,
       352,
       353,
-      354
+      354,
+      355,
+      356
     ],
     "psql": [
-      355,
-      356,
       357,
       358,
-      359
+      359,
+      360,
+      361
     ],
     "task": [
-      360,
-      361,
       362,
-      363
+      363,
+      364,
+      365
     ],
     "stripe": [
-      364,
-      365,
       366,
       367,
       368,
@@ -15685,15 +15738,15 @@
       376,
       377,
       378,
-      379
-    ],
-    "mkcert": [
+      379,
       380,
       381
     ],
-    "wsl": [
+    "mkcert": [
       382,
-      383,
+      383
+    ],
+    "wsl": [
       384,
       385,
       386,
@@ -15705,40 +15758,40 @@
       392,
       393,
       394,
-      395
-    ],
-    "puppy": [
-      396
-    ],
-    "kiro": [
+      395,
+      396,
       397
     ],
-    "kiro-cli": [
+    "puppy": [
       398
     ],
-    "codex": [
+    "kiro": [
       399
     ],
-    "c-guard": [
+    "kiro-cli": [
       400
     ],
+    "codex": [
+      401
+    ],
+    "c-guard": [
+      402
+    ],
     "usepwsh7": [
-      401,
-      402,
       403,
       404,
-      435,
-      436,
+      405,
+      406,
       437,
-      438
+      438,
+      439,
+      440
     ],
     "bash": [
-      405
+      407
     ],
     "pwsh": [
-      406,
-      415,
-      416,
+      408,
       417,
       418,
       419,
@@ -15747,40 +15800,42 @@
       422,
       423,
       424,
-      427,
-      428,
-      442,
-      446,
-      450,
-      454
+      425,
+      426,
+      429,
+      430,
+      444,
+      448,
+      452,
+      456
     ],
     "powershell": [
-      407,
-      458,
-      462,
-      466,
-      470
+      409,
+      460,
+      464,
+      468,
+      472
     ],
     "powershell.exe": [
-      408,
-      459,
-      463,
-      467,
-      471
+      410,
+      461,
+      465,
+      469,
+      473
     ],
     "cmd": [
-      411,
-      412,
       413,
       414,
-      425,
-      426
+      415,
+      416,
+      427,
+      428
     ],
     "pwsh.exe": [
-      443,
-      447,
-      451,
-      455
+      445,
+      449,
+      453,
+      457
     ]
   }
 }

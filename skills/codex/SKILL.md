@@ -74,9 +74,6 @@ Prompt must include: exact goal, scope boundaries, explicit exclusions,
 required output format. Same structure as Worker prompts (Goal, Scope,
 Approach, Constraints) but broader scope.
 
-Always pass a timeout: `timeout: 180000` (3 min) for small patches,
-`timeout: 300000` (5 min) for multi-file work.
-
 ## Rules
 
 - Review: `--sandbox read-only` always

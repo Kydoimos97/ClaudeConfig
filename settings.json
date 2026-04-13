@@ -1,161 +1,379 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "env": {
-    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
-    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "0",
-    "ENABLE_TOOL_SEARCH": "true"
-  },
+  "agent": "main",
   "attribution": {
     "commit": "",
     "pr": ""
   },
-  "permissions": {
-    "allow": [
-      "Read(*)",
-      "Write(*)",
-      "Edit(*)",
-      "Glob(*)",
-      "Grep(*)",
-      "Bash(*)",
-      "WebFetch(*)",
-      "WebSearch(*)",
-      "Skill(*)",
-      "Agent(*)",
-      "ToolSearch(*)",
-      "TaskCreate(*)",
-      "TaskUpdate(*)",
-      "TaskGet(*)",
-      "TaskList(*)",
-      "TaskOutput(*)",
-      "TaskStop(*)",
-      "ToolSearch(*)"
-    ],
-    "deny": [],
-    "ask": [],
-    "defaultMode": "acceptEdits"
+  "autoDreamEnabled": true,
+  "effortLevel": "medium",
+  "enabledPlugins": {
+    "chrome-devtools-mcp@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "mcp-server-dev@claude-plugins-official": true,
+    "microsoft-docs@claude-plugins-official": true,
+    "notion@claude-plugins-official": true,
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "slack@claude-plugins-official": true
   },
-  "model": "haiku",
+  "env": {
+    "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "0",
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "ENABLE_TOOL_SEARCH": "true"
+  },
   "hooks": {
-    "Stop": [
+    "Elicitation": [
       {
         "hooks": [
           {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh"
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh Elicitation",
+            "type": "command"
           },
           {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/claude-notify.sh completed"
+            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh",
+            "type": "command"
+          },
+          {
+            "command": "bash $HOME/.claude/hooks/claude-notify.sh elicitation",
+            "type": "command"
           }
         ]
       }
     ],
     "Notification": [
       {
-        "matcher": "",
         "hooks": [
           {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh"
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh Notification",
+            "type": "command"
+          },
+          {
+            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh",
+            "type": "command"
           }
-        ]
+        ],
+        "matcher": ""
       }
     ],
     "PermissionRequest": [
       {
-        "matcher": "",
         "hooks": [
           {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh"
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh PermissionRequest",
+            "type": "command"
           },
           {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/claude-notify.sh approval"
-          }
-        ]
-      }
-    ],
-    "Elicitation": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh"
+            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh",
+            "type": "command"
           },
           {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/claude-notify.sh elicitation"
+            "command": "bash $HOME/.claude/hooks/claude-notify.sh approval",
+            "type": "command"
           }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/command-guard.sh"
-          },
-          {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh"
-          }
-        ]
+        ],
+        "matcher": ""
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "*",
         "hooks": [
           {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/track-agent-tokens.sh"
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh PostToolUse",
+            "type": "command"
           },
           {
-            "type": "command",
-            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh"
+            "command": "bash $HOME/.claude/hooks/track-agent-tokens.sh",
+            "type": "command"
+          },
+          {
+            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh",
+            "type": "command"
           }
-        ]
+        ],
+        "matcher": ""
       }
     ],
     "PostToolUseFailure": [
       {
-        "matcher": "*",
         "hooks": [
           {
-            "type": "command",
-            "command": "bash -c 'cat >> $HOME/.claude/failed_commands.md'"
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh PostToolUseFailure",
+            "type": "command"
+          },
+          {
+            "command": "bash -c 'cat >> $HOME/.claude/failed_commands.md'",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh PreToolUse",
+            "type": "command"
+          },
+          {
+            "command": "bash $HOME/.claude/hooks/command-guard.sh",
+            "type": "command"
+          },
+          {
+            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh Stop",
+            "type": "command"
+          },
+          {
+            "command": "bash $HOME/.claude/hooks/hook-dispatcher.sh",
+            "type": "command"
+          },
+          {
+            "command": "bash $HOME/.claude/hooks/claude-notify.sh completed",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh SessionStart",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh SessionEnd",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh UserPromptSubmit",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh StopFailure",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh PermissionDenied",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh SubagentStart",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh SubagentStop",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "TaskCreated": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh TaskCreated",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh TaskCompleted",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "TeammateIdle": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh TeammateIdle",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "InstructionsLoaded": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh InstructionsLoaded",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "ConfigChange": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh ConfigChange",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "CwdChanged": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh CwdChanged",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "FileChanged": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh FileChanged",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh WorktreeCreate",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh WorktreeRemove",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh PreCompact",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh PostCompact",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "ElicitationResult": [
+      {
+        "hooks": [
+          {
+            "command": "bash $HOME/.claude/hooks/hook-debug-dump.sh ElicitationResult",
+            "type": "command"
           }
         ]
       }
     ]
   },
-  "statusLine": {
-    "type": "command",
-    "command": "pwsh -NoProfile -NonInteractive -File \"C:\\Users\\willem\\.claude\\statusline-command.ps1\""
-  },
-  "enabledPlugins": {
-    "slack@claude-plugins-official": true,
-    "code-review@claude-plugins-official": true,
-    "code-simplifier@claude-plugins-official": true,
-    "feature-dev@claude-plugins-official": true,
-    "notion@claude-plugins-official": true,
-    "microsoft-docs@claude-plugins-official": true,
-    "mcp-server-dev@claude-plugins-official": true,
-    "chrome-devtools-mcp@claude-plugins-official": true,
-    "claude-md-management@claude-plugins-official": true
-  },
+  "includeCoAuthoredBy": false,
+  "model": "sonnet",
+  "permissions": {
+      "allow": [
+        "Read(*)",
+        "Write(*)",
+        "Edit(*)",
+        "Glob(*)",
+        "Grep(*)",
+        "Bash(*)",
+        "WebFetch(*)",
+        "WebSearch(*)",
+        "Skill(*)",
+        "Agent(*)",
+        "ToolSearch(*)",
+        "TaskCreate(*)",
+        "TaskUpdate(*)",
+        "TaskGet(*)",
+        "TaskList(*)",
+        "TaskOutput(*)",
+        "TaskStop(*)",
+        "ToolSearch(*)"
+      ],
+      "deny": []
+    },
+  "showThinkingSummaries": true,
+  "skipDangerousModePermissionPrompt": true,
   "spinnerVerbs": {
     "mode": "replace",
     "verbs": [
       "Processing"
     ]
   },
-  "effortLevel": "medium",
-  "agent": "main",
-  "autoDreamEnabled": true,
-  "showThinkingSummaries": true,
-  "skipDangerousModePermissionPrompt": true
+  "statusLine": {
+    "command": "pwsh -NoProfile -NonInteractive -File \"C:\\Users\\willem\\.claude\\statusline-command.ps1\"",
+    "type": "command"
+  }
 }
