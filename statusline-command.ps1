@@ -33,6 +33,21 @@ $PIPE = " ${GR}|${R} "
 $raw = [Console]::In.ReadToEnd()
 $data = $raw | ConvertFrom-Json
 
+# Dump raw status to ~/.ccode/status/<session_id>.json so opcode can read it
+try {
+    $sid = $data.session_id
+    if ($sid) {
+        $statusDir = Join-Path $env:USERPROFILE '.ccode' 'status'
+        if (-not (Test-Path $statusDir)) {
+            New-Item -ItemType Directory -Path $statusDir -Force | Out-Null
+        }
+        $tmp = Join-Path $statusDir "$sid.tmp"
+        $out = Join-Path $statusDir "$sid.json"
+        $raw | Set-Content -Path $tmp -Encoding utf8 -NoNewline
+        Move-Item -Path $tmp -Destination $out -Force
+    }
+} catch { }
+
 try {
 
     $segs = [System.Collections.Generic.List[string]]::new()
